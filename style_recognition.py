@@ -219,15 +219,17 @@ def main():
                 if channel == 3:
                     sess.run(net['input'].assign(data))
                     sess.run(net['labels'].assign(label))
-                    # sess.run(train_op)
+                    # Train the model
                     optimizer.minimize(sess)
+                    # Update the accuracy
                     sess.run(acc_op)
+                    # Print out the accuracy value
                     acc_val = str(sess.run(acc))
                     print('accuracy:' + acc_val)
-
+                    # Print out the prediction
                     pre_val = str(sess.run(prediction))
                     print('prediction:' + pre_val)
-
+                    # Print out the actual labels
                     actual_val = str(label)
                     print('actual:' + actual_val)
 
