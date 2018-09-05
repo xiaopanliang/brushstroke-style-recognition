@@ -3,7 +3,7 @@ import numpy as np
 import scipy.io
 
 check_pt_path_str = 'checkpoint'
-batch_size = 2
+batch_size = 1
 img_height = 500
 img_width = 500
 
@@ -26,7 +26,8 @@ def fc_layer(name, layer_input):
 
 def get_weights(name, vgg_layers, i):
     weights = vgg_layers[i][0][0][2][0][0]
-    return tf.Variable(weights, name=name)
+    w = tf.Variable(weights, name=name)
+    return w
 
 
 def get_bias(name, vgg_layers, i):
