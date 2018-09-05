@@ -1,10 +1,9 @@
 import tensorflow as tf
 import numpy as np
 import scipy.io
-import matplotlib.pyplot as plt
 
 check_pt_path_str = 'checkpoint'
-batch_size = 10
+batch_size = 2
 img_height = 500
 img_width = 500
 
@@ -147,37 +146,16 @@ def cnn_model_fn():
     # Fully connected to get logits
     obj_logits = calc_obj_logits(net)
     texture_logits = calc_texture_logits(net)
-    logits = (obj_logits + texture_logits) / 2
+    logits = obj_logits * 0.05 + texture_logits * 0.95 + 1e-8
 
     prediction = tf.argmax(input=logits, axis=1, name='prediction')
     acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=prediction)
 
-    denoise_loss = tf.image.total_variation(net['input']) * 0.001
+    #    Denoise_Loss = tf.image.total_variation(net['input']) * 0.001
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)
     # loss = tf.Print(loss, [loss], 'loss:')
 
-    return loss, acc, acc_op
-
-    # predictions = {
-    #     "predictions": tf.argmax(input=logits, axis=1, name='prediction')
-    # }
-    # if mode == tf.estimator.ModeKeys.PREDICT:
-    #     return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-    #
-    # loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)
-    #
-    # if mode == tf.estimator.ModeKeys.TRAIN:
-    #     # optimization algorithm
-    #     optimizer = tf.train.AdamOptimizer()
-    #     optimizer_op = optimizer.minimize(loss, global_step=tf.train.get_global_step())
-    #     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=optimizer_op)
-    #
-    # eval_metric_ops = {
-    #     'accuracy': tf.metrics.accuracy(labels=labels, predictions=predictions['predictions'])
-    # }
-    #
-    # if mode == tf.estimator.ModeKeys.EVAL:
-    #     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+    return loss, acc, acc_op, prediction
 
 
 def load_imgs(img_path, label):
@@ -191,7 +169,6 @@ def load_imgs(img_path, label):
 def get_iterator():
     img_files = np.load('train_imgs.npy')
     labels = np.load('train_lbs.npy')
-    labels = abs(labels - 1)
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.shuffle(1000)
     dataset = dataset.map(map_func=load_imgs)
@@ -203,45 +180,66 @@ def get_iterator():
 def main():
     tf.logging.set_verbosity(tf.logging.INFO)
 
-    loss, acc, acc_op = cnn_model_fn()
-    # trainer = tf.train.AdamOptimizer()
-    # train_op = trainer.minimize(loss)
+    loss, acc, acc_op, prediction = cnn_model_fn()
 
     optimizer = tf.contrib.opt.ScipyOptimizerInterface(loss,
                                                        method='L-BFGS-B',
-                                                       options={'maxiter': 1000,
-                                                                'disp': 50})
-
+                                                       options={'maxiter': 3000,
+                                                                'disp': 50,
+                                                                'eps': 1e-08,
+                                                                'gtol': 1e-06,
+                                                                'ftol': 2.220446049250313e-10})
+    # Get the iterator for the data set
     itr = get_iterator()
-    # saveable = tf.contrib.data.make_saveable_from_iterator(itr)
-    # tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saveable)
-
     next_batch = itr.get_next()
 
+    # The counter for tracking the number of batches
     count = 0
 
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(tf.trainable_variables())
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
+
         print('restoring model...')
-        # saver.restore(sess, 'checkpoint/model.ckpt-90000')
-        print('restored:)')
+        test_weight = tf.get_default_graph().get_tensor_by_name('conv1_1_w:0')
+        prev = sess.run(test_weight)
+        saver.restore(sess, tf.train.latest_checkpoint('checkpoint/'))
+        after = sess.run(test_weight)
+        # Calc difference before read and after read
+        diff = after - prev
+        diff = diff.sum()
+        print('restored:' + str(diff))
+
         while True:
             try:
                 print('processing batch:' + str(count))
                 data, label = sess.run(next_batch)
-                sess.run(net['input'].assign(data))
-                sess.run(net['labels'].assign(label))
-                saver.save(sess, 'test_ckpt/')
-                optimizer.minimize(sess)
-                sess.run(acc_op)
-                print('accuracy:' + str(sess.run(acc)))
-                count += 1
+                _, _, _, channel = data.shape
+                if channel == 3:
+                    sess.run(net['input'].assign(data))
+                    sess.run(net['labels'].assign(label))
+                    # sess.run(train_op)
+                    optimizer.minimize(sess)
+                    sess.run(acc_op)
+                    acc_val = str(sess.run(acc))
+                    print('accuracy:' + acc_val)
+
+                    pre_val = str(sess.run(prediction))
+                    print('prediction:' + pre_val)
+
+                    actual_val = str(label)
+                    print('actual:' + actual_val)
+
+                    if count % 10 == 0:
+                        saver.save(sess, 'checkpoint/model.ckpt')
+
+                    count += 1
             except tf.errors.OutOfRangeError:
                 print("End of dataset")  # ==> "End of dataset"
                 break
-                # sess.run(itr.initializer)
+            except:
+                print('Error occurs on processing batch:' + str(count))
 
 
 if __name__ == "__main__":
