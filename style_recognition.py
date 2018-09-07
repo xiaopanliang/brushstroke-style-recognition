@@ -2,8 +2,8 @@ import tensorflow as tf
 import numpy as np
 import scipy.io
 
-check_pt_path_str = 'checkpoint'
-batch_size = 1
+check_pt_path_str = 'checkpoint/'
+batch_size = 2
 img_height = 500
 img_width = 500
 
@@ -154,7 +154,6 @@ def cnn_model_fn():
 
     #    Denoise_Loss = tf.image.total_variation(net['input']) * 0.001
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)
-    # loss = tf.Print(loss, [loss], 'loss:')
 
     return loss, acc, acc_op, prediction
 
@@ -183,13 +182,9 @@ def main():
 
     loss, acc, acc_op, prediction = cnn_model_fn()
 
-    optimizer = tf.contrib.opt.ScipyOptimizerInterface(loss,
-                                                       method='L-BFGS-B',
-                                                       options={'maxiter': 3000,
-                                                                'disp': 50,
-                                                                'eps': 1e-08,
-                                                                'gtol': 1e-06,
-                                                                'ftol': 2.220446049250313e-10})
+    optimizer = tf.train.AdamOptimizer()
+    train_op = optimizer.minimize(loss)
+
     # Get the iterator for the data set
     itr = get_iterator()
     next_batch = itr.get_next()
@@ -205,7 +200,7 @@ def main():
         print('restoring model...')
         test_weight = tf.get_default_graph().get_tensor_by_name('conv1_1_w:0')
         prev = sess.run(test_weight)
-        saver.restore(sess, tf.train.latest_checkpoint('checkpoint/'))
+        saver.restore(sess, tf.train.latest_checkpoint(check_pt_path_str))
         after = sess.run(test_weight)
         # Calc difference before read and after read
         diff = after - prev
@@ -214,6 +209,7 @@ def main():
 
         while True:
             try:
+                print('********************************')
                 print('processing batch:' + str(count))
                 data, label = sess.run(next_batch)
                 _, _, _, channel = data.shape
@@ -221,18 +217,21 @@ def main():
                     sess.run(net['input'].assign(data))
                     sess.run(net['labels'].assign(label))
                     # Train the model
-                    optimizer.minimize(sess)
-                    # Update the accuracy
-                    sess.run(acc_op)
-                    # Print out the accuracy value
-                    acc_val = str(sess.run(acc))
-                    print('accuracy:' + acc_val)
-                    # Print out the prediction
-                    pre_val = str(sess.run(prediction))
-                    print('prediction:' + pre_val)
-                    # Print out the actual labels
-                    actual_val = str(label)
-                    print('actual:' + actual_val)
+                    for _ in range(10):
+                        sess.run(train_op)
+                        # Update the accuracy
+                        sess.run(acc_op)
+                        # Print out the accuracy value
+                        acc_val = sess.run(acc)
+                        loss_val = sess.run(loss)
+                        print('accuracy:' + str(acc_val))
+                        print('loss:' + str(loss_val))
+                        # Print out the prediction
+                        pre_val = str(sess.run(prediction))
+                        print('prediction:' + pre_val)
+                        # Print out the actual labels
+                        actual_val = str(label)
+                        print('actual:' + actual_val)
 
                     if count % 10 == 0:
                         saver.save(sess, 'checkpoint/model.ckpt')
