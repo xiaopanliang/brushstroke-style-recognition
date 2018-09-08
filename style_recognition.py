@@ -1,11 +1,14 @@
 import tensorflow as tf
 import numpy as np
 import scipy.io
+import matplotlib.pyplot as plt
+
 
 check_pt_path_str = 'checkpoint/'
 batch_size = 2
 img_height = 500
 img_width = 500
+epochs = 3
 
 
 def conv_layer(name, layer_input, w):
@@ -78,8 +81,8 @@ def cnn_model_fn():
     vgg_raw_net = scipy.io.loadmat('imagenet-vgg-verydeep-19.mat')
     vgg_layers = vgg_raw_net['layers'][0]
     print('constructing layers...')
-    net['input'] = tf.Variable(np.zeros([batch_size, img_height, img_width, 3]), dtype=tf.float32, trainable=False)
-    net['labels'] = tf.Variable(np.zeros([batch_size]), dtype=tf.int32, trainable=False)
+    net['input'] = tf.placeholder(tf.float32, shape=[batch_size, img_height, img_width, 3])
+    net['labels'] = tf.placeholder(tf.int32, shape=[batch_size])
 
     print('LAYER GROUP 1')
     net['conv1_1'] = conv_layer('conv1_1', net['input'], w=get_weights('conv1_1_w', vgg_layers, 0))
@@ -170,6 +173,7 @@ def get_iterator():
     img_files = np.load('train_imgs.npy')
     labels = np.load('train_lbs.npy')
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
+    dataset = dataset.repeat(epochs)
     dataset = dataset.shuffle(1000)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
@@ -209,32 +213,32 @@ def main():
 
         while True:
             try:
+                data, label = sess.run(next_batch)
                 print('********************************')
                 print('processing batch:' + str(count))
-                data, label = sess.run(next_batch)
                 _, _, _, channel = data.shape
                 if channel == 3:
-                    sess.run(net['input'].assign(data))
-                    sess.run(net['labels'].assign(label))
+                    feed_dict = {net['input']: data, net['labels']: label}
                     # Train the model
-                    for _ in range(10):
-                        sess.run(train_op)
-                        # Update the accuracy
-                        sess.run(acc_op)
-                        # Print out the accuracy value
-                        acc_val = sess.run(acc)
-                        loss_val = sess.run(loss)
-                        print('accuracy:' + str(acc_val))
-                        print('loss:' + str(loss_val))
-                        # Print out the prediction
-                        pre_val = str(sess.run(prediction))
-                        print('prediction:' + pre_val)
-                        # Print out the actual labels
-                        actual_val = str(label)
-                        print('actual:' + actual_val)
+                    sess.run(train_op, feed_dict=feed_dict)
+                    # Update the accuracy
+                    sess.run(acc_op, feed_dict=feed_dict)
+                    # Print out the accuracy value
+                    acc_val = sess.run(acc, feed_dict=feed_dict)
+                    loss_val = sess.run(loss, feed_dict=feed_dict)
+                    print('accuracy:' + str(acc_val))
+                    print('loss:' + str(loss_val))
+                    # Print out the prediction
+                    pre_val = str(sess.run(prediction, feed_dict=feed_dict))
+                    print('prediction:' + pre_val)
+                    # Print out the actual labels
+                    actual_val = str(label)
+                    print('actual:' + actual_val)
 
-                    if count % 10 == 0:
-                        saver.save(sess, 'checkpoint/model.ckpt')
+                    if count % 1 == 0:
+                        print('********************************')
+                        print("saving checkpoint to '" + check_pt_path_str + "'")
+                        saver.save(sess, check_pt_path_str + 'model.ckpt')
 
                     count += 1
             except tf.errors.OutOfRangeError:
