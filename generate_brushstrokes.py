@@ -8,6 +8,9 @@ import os
 import timeit
 
 
+expected_styles = {'Impressionism'}
+
+
 def is_valid_pt(point, max_height, max_width):
     return (0 <= point[0] < max_height) and (0 <= point[1] < max_width)
 
@@ -216,21 +219,21 @@ def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_
 
 
 def main():
-    cores = 4
+    cores = 8
 
-    base = 'output/step4/'  # TODO: this line should be adjusted to match with the path
-    output_folder = 'output/step5/'
+    base = 'output/step3/'  # TODO: this line should be adjusted to match with the path
+    output_folder = 'output/step4/'
 
     folders = os.listdir(base)
 
     ori_file_names = []
     result_file_names = []
     for folder in folders:
-        if folder != '.DS_Store':
+        if folder != '.DS_Store' and folder in expected_styles:
             if not os.path.isdir(output_folder + folder):
                 os.makedirs(output_folder + folder)
-            for file in os.listdir(base + folder + '/'):
-                if file != '.DS_Store':
+            for file in os.listdir(output_folder + folder + '/'):
+                if file != '.DS_Store' and not os.path.isfile(base + folder + '/' + file):
                     ori_file_names.append(base + folder + '/' + file)
                     result_file_names.append(output_folder + folder + '/' + file)
 
@@ -274,8 +277,5 @@ def main():
 
 if __name__ == '__main__':
     print('starting the brush stroke extraction...')
-    start = timeit.default_timer()
     main()
-    stop = timeit.default_timer()
     print('finished brush stroke extraction')
-    print('total running time:' + str(stop - start) + 's')

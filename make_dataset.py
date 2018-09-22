@@ -68,6 +68,8 @@ def main():
             label += 1
     np.save('train_imgs', train_files)
     np.save('train_lbs', train_labels)
+    np.save('vali_imgs', eval_files)
+    np.save('vali_lbs', eval_labels)
 
 
 if __name__ == '__main__':
