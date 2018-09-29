@@ -36,7 +36,7 @@ def get_weights(name, vgg_layers, i):
 
 def get_bias(name, vgg_layers, i):
     bias = vgg_layers[i][0][0][2][0][1]
-    b = tf.Variable(np.reshape(bias, bias.size), name=name)
+    b = tf.Variable(np.reshape(bias, bias.size), name=name) # TODO: check later
     return b
 
 
@@ -51,9 +51,9 @@ def calc_texture_logits(net):
         M = height.value * width.value
         N = channels.value
         F = tf.reshape(layer_data, [-1, M, N])
-        G = tf.matmul(tf.transpose(F, perm=[0, 2, 1]), F)
+        G = tf.matmul(tf.transpose(F, perm=[0, 2, 1]), F) # [img_num, M, N]
         _, y, x = G.get_shape()
-        G = tf.reshape(G, [-1, y.value * x.value])
+        G = tf.reshape(G, [-1, y.value * x.value]) # [img_num, M * N]
         if connected_G is None:
             connected_G = G
         else:
@@ -70,8 +70,10 @@ def calc_obj_logits(net):
     _, height, width, depth = object_output.get_shape()
     object_output = tf.reshape(object_output, [-1, height.value * width.value * depth.value])
     net['o_fc1'] = fc_layer('fc_o1', object_output, 4096, tf.nn.relu)
-    net['o_fc2'] = fc_layer('fc_o2', tf.layers.dropout(net['o_fc1'], 0.75), 4096, tf.nn.relu)
-    net['o_fc3'] = fc_layer('fc_o3', tf.layers.dropout(net['o_fc2'], 0.75), units, None)
+    dp1 = tf.layers.dropout(net['o_fc1'], 0.75)
+    net['o_fc2'] = fc_layer('fc_o2', dp1, 4096, tf.nn.relu)
+    dp2 = tf.layers.dropout(net['o_fc2'], 0.75)
+    net['o_fc3'] = fc_layer('fc_o3', dp2, units, None)
     return net['o_fc3']
 
 
@@ -174,6 +176,7 @@ def cnn_model_fn():
 
     lo_sum = tf.reduce_sum(logits, 1)
     lo = tf.reduce_sum(logits / tf.reshape(lo_sum, (-1, 1)), 0)
+
     prediction = tf.argmax(input=logits, axis=1, name='prediction')
     acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=prediction)
 
@@ -185,6 +188,7 @@ def cnn_model_fn():
 
     regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, weights)
 
+    # TODO: Is this operation allowed
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) + regularization_penalty
 
     return loss, acc, acc_op, prediction, logits, lo
