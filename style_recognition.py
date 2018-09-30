@@ -47,6 +47,8 @@ def calc_texture_gram(net):
         N = channels.value
         F = tf.reshape(layer_data, [-1, M, N])
         G = tf.matmul(tf.transpose(F, perm=[0, 2, 1]), F)  # [img_num, M, N]
+        _, y, x = G.get_shape()
+        G = tf.reshape(G, [-1, y.value * x.value])  # [img_num, M * N]
         if connected_G is None:
             connected_G = G
         else:
@@ -88,13 +90,19 @@ def pinv(A, b, reltol=1e-6):
     s_inv = tf.diag(tf.concat([1. / s, tf.zeros([tf.size(b) - tf.size(s)])], 0))
 
     # Compute v * s_inv * u_t * b from the left to avoid forming large intermediate matrices.
-    return tf.matmul(v, tf.matmul(s_inv, tf.matmul(u, tf.reshape(b, [-1, 1]), transpose_a=True)))
+    tmp = tf.matmul(u, b, transpose_a=True)
+    result = tf.matmul(v, tf.matmul(s_inv, tmp))
+    return result
 
 
 def calc_label_gram(net, vgg_layers):
+    a = vgg_layers[41][0][0][2][0][0][:, :, :, :units]
+    _, _, _, depth = a.shape
+    b = tf.reshape(vgg_layers[41][0][0][2][0][1][:units], [-1])
+    c = pinv(a, b)
     inverse3 = tf.get_variable(name='inverse3',
                                initializer=tf.constant_initializer(
-                                   pinv(vgg_layers[41][0][0][2][0][0], vgg_layers[41][0][0][2][0][1])
+                                   c
                                ),
                                trainable=False)
     fc2 = tf.matmul(net['labels'], inverse3)
@@ -320,7 +328,6 @@ def main():
         while True:
             try:
                 train_data, train_label = sess.run(next_train_batch)
-                vali_data, vali_label = sess.run(next_vali_batch)
                 print('********************************')
                 print('processing batch:' + str(count))
                 _, _, _, channel = train_data.shape
