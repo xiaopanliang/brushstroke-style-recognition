@@ -47,8 +47,6 @@ def calc_texture_gram(net):
         N = channels.value
         F = tf.reshape(layer_data, [-1, M, N])
         G = tf.matmul(tf.transpose(F, perm=[0, 2, 1]), F)  # [img_num, M, N]
-        _, y, x = G.get_shape()
-        G = tf.reshape(G, [-1, y.value * x.value])  # [img_num, M * N]
         if connected_G is None:
             connected_G = G
         else:
@@ -233,28 +231,24 @@ def cnn_model_fn():
 
     net['pool5'] = pool_layer('pool5', net['relu5_4'])
 
-    # Fully connected to get logits
-    obj_logits = calc_obj_logits(net, vgg_layers)
-    texture_logits = calc_obj_logits(net, vgg_layers)
-
     texture_gram = calc_texture_gram(net)
     label_gram = calc_label_gram(net, vgg_layers)
+    _, M, N = texture_gram.get_shape()
+    K = 1. / (2. * N.value ** 0.5 * M.value ** 0.5)
+    texture_loss = K * tf.reduce_sum(tf.pow((texture_gram - label_gram), 2))
 
+    obj_logits = calc_obj_logits(net, vgg_layers)
+    obj_loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits)
 
+    loss = texture_loss + obj_loss
+
+    # Fully connected to get logits
+    texture_logits = calc_texture_logits(net, vgg_layers)
+    logits = (obj_logits + texture_logits) / 2
     prediction = tf.argmax(input=logits, axis=1, name='prediction')
     acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=prediction)
 
-    l1_regularizer = tf.contrib.layers.l2_regularizer(
-        scale=0.0001, scope=None
-    )
-
-    weights = tf.trainable_variables()  # all vars of your graph
-
-    regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, weights)
-
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) + regularization_penalty
-
-    return loss, acc, acc_op, prediction, logits, lo
+    return loss, acc, acc_op, prediction
 
 
 def load_imgs(img_path, label):
@@ -291,7 +285,7 @@ def get_vali_iterator():
 def main():
     tf.logging.set_verbosity(tf.logging.INFO)
 
-    loss, acc, acc_op, prediction, logits, lo = cnn_model_fn()
+    loss, acc, acc_op, prediction = cnn_model_fn()
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.001 / 2, beta1=0.9, beta2=0.999, epsilon=1e-08,
                                        use_locking=False)
