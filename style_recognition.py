@@ -23,11 +23,6 @@ def pool_layer(name, layer_input):
     return tf.nn.avg_pool(layer_input, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
 
-def fc_layer(name, layer_input, units, activation):
-    return tf.layers.dense(inputs=layer_input, units=units, name=name,
-                           activation=activation)  # TODO: Add the units here
-
-
 def get_weights(name, vgg_layers, i):
     weights = vgg_layers[i][0][0][2][0][0]
     w = tf.Variable(weights, name=name)
@@ -36,11 +31,11 @@ def get_weights(name, vgg_layers, i):
 
 def get_bias(name, vgg_layers, i):
     bias = vgg_layers[i][0][0][2][0][1]
-    b = tf.Variable(np.reshape(bias, bias.size), name=name) # TODO: check later
+    b = tf.Variable(np.reshape(bias, bias.size), name=name)  # TODO: check later
     return b
 
 
-def calc_texture_logits(net):
+def calc_texture_gram(net):
     # Load the style image to the model
     layers = ['relu1_2', 'relu2_2', 'relu3_4', 'relu4_4', 'relu5_4']
 
@@ -51,30 +46,99 @@ def calc_texture_logits(net):
         M = height.value * width.value
         N = channels.value
         F = tf.reshape(layer_data, [-1, M, N])
-        G = tf.matmul(tf.transpose(F, perm=[0, 2, 1]), F) # [img_num, M, N]
+        G = tf.matmul(tf.transpose(F, perm=[0, 2, 1]), F)  # [img_num, M, N]
         _, y, x = G.get_shape()
-        G = tf.reshape(G, [-1, y.value * x.value]) # [img_num, M * N]
+        G = tf.reshape(G, [-1, y.value * x.value])  # [img_num, M * N]
         if connected_G is None:
             connected_G = G
         else:
             connected_G = tf.concat([connected_G, G], axis=1)
-    net['g_fc1'] = fc_layer('fc_g1', connected_G, 2048, tf.nn.relu)
-    net['g_fc2'] = fc_layer('fc_g2', tf.layers.dropout(net['g_fc1'], 0.75), 1024, tf.nn.relu)
-    net['g_fc3'] = fc_layer('fc_g3', tf.layers.dropout(net['g_fc2'], 0.75), units, None)
-    return net['g_fc3']
+
+    return connected_G
 
 
-def calc_obj_logits(net):
+def calc_texture_logits(net, vgg_layers):
+    gram = calc_texture_gram(net)
+    fc1 = tf.layers.dense(inputs=gram,
+                          units=4096,
+                          kernel_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][1]),
+                          trainable=False,
+                          activation=tf.nn.relu)
+    fc2 = tf.layers.dense(inputs=fc1,
+                          units=4096,
+                          kernel_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][1]),
+                          trainable=False,
+                          activation=tf.nn.relu)
+    fc3 = tf.layers.dense(inputs=fc2,
+                          units=units,
+                          kernel_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][1]),
+                          trainable=False,
+                          activation=None)
+    return fc3
+
+
+def pinv(A, b, reltol=1e-6):
+    # Compute the SVD of the input matrix A
+    s, u, v = tf.svd(A)
+
+    # Invert s, clear entries lower than reltol*s[0].
+    atol = tf.reduce_max(s) * reltol
+    s = tf.boolean_mask(s, s > atol)
+    s_inv = tf.diag(tf.concat([1. / s, tf.zeros([tf.size(b) - tf.size(s)])], 0))
+
+    # Compute v * s_inv * u_t * b from the left to avoid forming large intermediate matrices.
+    return tf.matmul(v, tf.matmul(s_inv, tf.matmul(u, tf.reshape(b, [-1, 1]), transpose_a=True)))
+
+
+def calc_label_gram(net, vgg_layers):
+    inverse3 = tf.get_variable(name='inverse3',
+                               initializer=tf.constant_initializer(
+                                   pinv(vgg_layers[41][0][0][2][0][0], vgg_layers[41][0][0][2][0][1])
+                               ),
+                               trainable=False)
+    fc2 = tf.matmul(net['labels'], inverse3)
+    inverse2 = tf.get_variable(name='inverse2',
+                               initializer=tf.constant_initializer(
+                                   pinv(vgg_layers[39][0][0][2][0][0], vgg_layers[39][0][0][2][0][1])
+                               ),
+                               trainable=False)
+    fc1 = tf.matmul(fc2, inverse2)
+    inverse1 = tf.get_variable(name='inverse1',
+                               initializer=tf.constant_initializer(
+                                   pinv(vgg_layers[37][0][0][2][0][0], vgg_layers[37][0][0][2][0][1])
+                               ),
+                               trainable=False)
+    gram_matrix = tf.matmul(fc1, inverse1)
+    return gram_matrix
+
+
+def calc_obj_logits(net, vgg_layers):
     # Load the content image to the model
     object_output = net['pool5']
     _, height, width, depth = object_output.get_shape()
     object_output = tf.reshape(object_output, [-1, height.value * width.value * depth.value])
-    net['o_fc1'] = fc_layer('fc_o1', object_output, 4096, tf.nn.relu)
-    dp1 = tf.layers.dropout(net['o_fc1'], 0.75)
-    net['o_fc2'] = fc_layer('fc_o2', dp1, 4096, tf.nn.relu)
-    dp2 = tf.layers.dropout(net['o_fc2'], 0.75)
-    net['o_fc3'] = fc_layer('fc_o3', dp2, units, None)
-    return net['o_fc3']
+    fc1 = tf.layers.dense(inputs=object_output,
+                          units=4096,
+                          kernel_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][1]),
+                          trainable=True,
+                          activation=tf.nn.relu)
+    fc2 = tf.layers.dense(inputs=fc1,
+                          units=4096,
+                          kernel_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][1]),
+                          trainable=True,
+                          activation=tf.nn.relu)
+    fc3 = tf.layers.dense(inputs=fc2,
+                          units=units,
+                          kernel_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][1]),
+                          trainable=True,
+                          activation=None)
+    return fc3
 
 
 net = {}
@@ -170,12 +234,12 @@ def cnn_model_fn():
     net['pool5'] = pool_layer('pool5', net['relu5_4'])
 
     # Fully connected to get logits
-    obj_logits = calc_obj_logits(net)
-    texture_logits = calc_texture_logits(net)
-    logits = obj_logits * 0.9 + texture_logits * 0.1
+    obj_logits = calc_obj_logits(net, vgg_layers)
+    texture_logits = calc_obj_logits(net, vgg_layers)
 
-    lo_sum = tf.reduce_sum(logits, 1)
-    lo = tf.reduce_sum(logits / tf.reshape(lo_sum, (-1, 1)), 0)
+    texture_gram = calc_texture_gram(net)
+    label_gram = calc_label_gram(net, vgg_layers)
+
 
     prediction = tf.argmax(input=logits, axis=1, name='prediction')
     acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=prediction)
@@ -188,7 +252,6 @@ def cnn_model_fn():
 
     regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, weights)
 
-    # TODO: Is this operation allowed
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) + regularization_penalty
 
     return loss, acc, acc_op, prediction, logits, lo
