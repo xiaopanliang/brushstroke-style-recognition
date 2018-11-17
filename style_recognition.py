@@ -1,22 +1,14 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Sep 30 02:02:31 2018
-
-@author: jpansh
-"""
-
 import tensorflow as tf
-import tensorflow_probability as tfp
 import numpy as np
 import scipy.io
 import matplotlib.pyplot as plt
 
 check_pt_path_str = 'checkpoint/'
-batch_size = 1
-img_height = 224
-img_width = 224
+batch_size = 2
+img_height = 64
+img_width = 64
 epochs = 100
-units = 2
+units = 3
 
 
 def conv_layer(name, layer_input, w):
@@ -30,12 +22,6 @@ def relu_layer(name, layer_input, b):
 def pool_layer(name, layer_input):
     return tf.nn.avg_pool(layer_input, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
-
-# def texture_fc_layer(name, layer_input, w):
-#    return tf.layers.dense(inputs=layer_input, units=units, name=name, activation=activation)
-#
-# def object_fc_layer(name, layer_input, w):
-#    return tf.layers.dense(inputs=layer_input, units=units, name=name, activation=activation)
 
 def get_weights(name, vgg_layers, i):
     weights = vgg_layers[i][0][0][2][0][0]
@@ -78,80 +64,60 @@ def calc_texture_logits(net, vgg_layers):
                           kernel_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][0]),
                           bias_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][1]),
                           trainable=False,
-                          activation=None)
+                          activation=tf.nn.relu)
     fc2 = tf.layers.dense(inputs=fc1,
                           units=4096,
                           kernel_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][0]),
                           bias_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][1]),
                           trainable=False,
-                          activation=None)
+                          activation=tf.nn.relu)
     fc3 = tf.layers.dense(inputs=fc2,
                           units=units,
-                          kernel_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][0][:, :, :, :units]),
-                          bias_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][1][:units]),
+                          kernel_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][1]),
                           trainable=False,
                           activation=None)
     return fc3
 
 
+def pinv(A, b, reltol=1e-6):
+    # Compute the SVD of the input matrix A
+    s, u, v = tf.svd(A)
+
+    # Invert s, clear entries lower than reltol*s[0].
+    atol = tf.reduce_max(s) * reltol
+    s = tf.boolean_mask(s, s > atol)
+    s_inv = tf.diag(tf.concat([1. / s, tf.zeros([tf.size(b) - tf.size(s)])], 0))
+
+    # Compute v * s_inv * u_t * b from the left to avoid forming large intermediate matrices.
+    tmp = tf.matmul(u, b, transpose_a=True)
+    result = tf.matmul(v, tf.matmul(s_inv, tmp))
+    return result
+
+
 def calc_label_gram(net, vgg_layers):
-    sess = tf.Session()
-
-    object_output = tf.one_hot(net['labels'], units)
-
-    Inverse_matrix1 = tfp.math.pinv(vgg_layers[41][0][0][2][0][0][:, :, :, :units])
-    Inverse_matrix2 = tfp.math.pinv(vgg_layers[39][0][0][2][0][0])
-    Inverse_matrix3 = tfp.math.pinv(vgg_layers[37][0][0][2][0][0])
-    sess.run(tf.global_variables_initializer())
-    Inverse_matrix_array1 = sess.run(Inverse_matrix1)
-    Inverse_matrix_array2 = sess.run(Inverse_matrix2)
-    Inverse_matrix_array3 = sess.run(Inverse_matrix3)
-
-    fc1_b = tf.layers.dense(inputs=object_output,
-                            units=units,  # units or depth
-                            kernel_initializer=tf.constant_initializer(np.diag(np.ones(units))),
-                            bias_initializer=tf.constant_initializer(-vgg_layers[41][0][0][2][0][1][:units]),
-                            trainable=False,
-                            activation=None)
-
-    fc1_a = tf.layers.dense(inputs=fc1_b,
-                            units=4096,
-                            kernel_initializer=tf.constant_initializer(Inverse_matrix_array1),
-                            bias_initializer=tf.constant_initializer(np.zeros([])),
-                            trainable=False,
-                            activation=None)
-
-    fc2_b = tf.layers.dense(inputs=fc1_a,
-                            units=4096,  # units or depth
-                            kernel_initializer=tf.constant_initializer(np.diag(np.ones(4096))),
-                            bias_initializer=tf.constant_initializer(-vgg_layers[39][0][0][2][0][1]),
-                            trainable=False,
-                            activation=None)
-
-    fc2_a = tf.layers.dense(inputs=fc2_b,
-                            units=4096,
-                            kernel_initializer=tf.constant_initializer(Inverse_matrix_array2),
-                            bias_initializer=tf.constant_initializer(np.zeros([])),
-                            trainable=False,
-                            activation=None)
-
-    fc3_b = tf.layers.dense(inputs=fc2_a,
-                            units=4096,  # units or depth
-                            kernel_initializer=tf.constant_initializer(np.diag(np.ones(4096))),
-                            bias_initializer=tf.constant_initializer(-vgg_layers[37][0][0][2][0][1]),
-                            trainable=False,
-                            activation=None)
-
-    fc3_a = tf.layers.dense(inputs=fc3_b,
-                            units=4096,
-                            kernel_initializer=tf.constant_initializer(Inverse_matrix_array3),
-                            bias_initializer=tf.constant_initializer(np.zeros([])),
-                            trainable=False,
-                            activation=None)
-
-    object_input = net['pool5']
-    size, height, width, depth = object_input.get_shape()
-    gram_matrix = tf.reshape(fc3_a, [size.value, height.value, width.value, depth.value])
+    a = vgg_layers[41][0][0][2][0][0][:, :, :, :units]
+    _, _, _, depth = a.shape
+    b = tf.reshape(vgg_layers[41][0][0][2][0][1][:units], [-1])
+    c = pinv(a, b)
+    inverse3 = tf.get_variable(name='inverse3',
+                               initializer=tf.constant_initializer(
+                                   c
+                               ),
+                               trainable=False)
+    fc2 = tf.matmul(net['labels'], inverse3)
+    inverse2 = tf.get_variable(name='inverse2',
+                               initializer=tf.constant_initializer(
+                                   pinv(vgg_layers[39][0][0][2][0][0], vgg_layers[39][0][0][2][0][1])
+                               ),
+                               trainable=False)
+    fc1 = tf.matmul(fc2, inverse2)
+    inverse1 = tf.get_variable(name='inverse1',
+                               initializer=tf.constant_initializer(
+                                   pinv(vgg_layers[37][0][0][2][0][0], vgg_layers[37][0][0][2][0][1])
+                               ),
+                               trainable=False)
+    gram_matrix = tf.matmul(fc1, inverse1)
     return gram_matrix
 
 
@@ -160,14 +126,12 @@ def calc_obj_logits(net, vgg_layers):
     object_output = net['pool5']
     _, height, width, depth = object_output.get_shape()
     object_output = tf.reshape(object_output, [-1, height.value * width.value * depth.value])
-
     fc1 = tf.layers.dense(inputs=object_output,
                           units=4096,
                           kernel_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][0]),
                           bias_initializer=tf.constant_initializer(vgg_layers[37][0][0][2][0][1]),
                           trainable=True,
                           activation=tf.nn.relu)
-
     fc2 = tf.layers.dense(inputs=fc1,
                           units=4096,
                           kernel_initializer=tf.constant_initializer(vgg_layers[39][0][0][2][0][0]),
@@ -176,10 +140,10 @@ def calc_obj_logits(net, vgg_layers):
                           activation=tf.nn.relu)
     fc3 = tf.layers.dense(inputs=fc2,
                           units=units,
-                          kernel_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][0][:, :, :, :units]),
-                          bias_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][1][:units]),
+                          kernel_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][0]),
+                          bias_initializer=tf.constant_initializer(vgg_layers[41][0][0][2][0][1]),
                           trainable=True,
-                          activation=tf.nn.relu)
+                          activation=None)
     return fc3
 
 
@@ -202,8 +166,8 @@ def cnn_model_fn():
     net['relu1_1'] = relu_layer('relu1_1', net['conv1_1'], b=get_bias('relu1_1_b', vgg_layers, 0))
 
     net['conv1_2'] = conv_layer('conv1_2', net['relu1_1'], w=get_weights('conv1_2_w', vgg_layers, 2))
-    #    net['bn1_2'] = tf.layers.batch_normalization(net['conv1_2'], training=False, momentum=0.9)
-    net['relu1_2'] = relu_layer('relu1_2', net['conv1_2'], b=get_bias('relu1_2_b', vgg_layers, 2))
+    net['bn1_2'] = tf.layers.batch_normalization(net['conv1_2'], training=False, momentum=0.9)
+    net['relu1_2'] = relu_layer('relu1_2', net['bn1_2'], b=get_bias('relu1_2_b', vgg_layers, 2))
 
     net['pool1'] = pool_layer('pool1', net['relu1_2'])
 
@@ -213,8 +177,8 @@ def cnn_model_fn():
     net['relu2_1'] = relu_layer('relu2_1', net['conv2_1'], b=get_bias('relu2_1_b', vgg_layers, 5))
 
     net['conv2_2'] = conv_layer('conv2_2', net['relu2_1'], w=get_weights('conv2_2_w', vgg_layers, 7))
-    #    net['bn2_2'] = tf.layers.batch_normalization(net['conv2_2'], training=False, momentum=0.9)
-    net['relu2_2'] = relu_layer('relu2_2', net['conv2_2'], b=get_bias('relu2_2_b', vgg_layers, 7))
+    net['bn2_2'] = tf.layers.batch_normalization(net['conv2_2'], training=False, momentum=0.9)
+    net['relu2_2'] = relu_layer('relu2_2', net['bn2_2'], b=get_bias('relu2_2_b', vgg_layers, 7))
 
     net['pool2'] = pool_layer('pool2', net['relu2_2'])
 
@@ -232,8 +196,8 @@ def cnn_model_fn():
     net['relu3_3'] = relu_layer('relu3_3', net['conv3_3'], b=get_bias('relu3_3_b', vgg_layers, 14))
 
     net['conv3_4'] = conv_layer('conv3_4', net['relu3_3'], w=get_weights('conv3_4_w', vgg_layers, 16))
-    #    net['bn3_4'] = tf.layers.batch_normalization(net['conv3_4'], training=False, momentum=0.9)
-    net['relu3_4'] = relu_layer('relu3_4', net['conv3_4'], b=get_bias('relu3_4_b', vgg_layers, 16))
+    net['bn3_4'] = tf.layers.batch_normalization(net['conv3_4'], training=False, momentum=0.9)
+    net['relu3_4'] = relu_layer('relu3_4', net['bn3_4'], b=get_bias('relu3_4_b', vgg_layers, 16))
 
     net['pool3'] = pool_layer('pool3', net['relu3_4'])
 
@@ -251,8 +215,8 @@ def cnn_model_fn():
     net['relu4_3'] = relu_layer('relu4_3', net['conv4_3'], b=get_bias('relu4_3_b', vgg_layers, 23))
 
     net['conv4_4'] = conv_layer('conv4_4', net['relu4_3'], w=get_weights('conv4_4_w', vgg_layers, 25))
-    #    net['bn4_4'] = tf.layers.batch_normalization(net['conv4_4'], training=False, momentum=0.9)
-    net['relu4_4'] = relu_layer('relu4_4', net['conv4_4'], b=get_bias('relu4_4_b', vgg_layers, 25))
+    net['bn4_4'] = tf.layers.batch_normalization(net['conv4_4'], training=False, momentum=0.9)
+    net['relu4_4'] = relu_layer('relu4_4', net['bn4_4'], b=get_bias('relu4_4_b', vgg_layers, 25))
 
     net['pool4'] = pool_layer('pool4', net['relu4_4'])
 
@@ -270,22 +234,24 @@ def cnn_model_fn():
     net['relu5_3'] = relu_layer('relu5_3', net['conv5_3'], b=get_bias('relu5_3', vgg_layers, 32))
 
     net['conv5_4'] = conv_layer('conv5_4', net['relu5_3'], w=get_weights('conv5_4', vgg_layers, 34))
-    #    net['bn5_4'] = tf.layers.batch_normalization(net['conv5_4'], training=False, momentum=0.9)
-    net['relu5_4'] = relu_layer('relu5_4', net['conv5_4'], b=get_bias('relu5_4', vgg_layers, 34))
+    net['bn5_4'] = tf.layers.batch_normalization(net['conv5_4'], training=False, momentum=0.9)
+    net['relu5_4'] = relu_layer('relu5_4', net['bn5_4'], b=get_bias('relu5_4', vgg_layers, 34))
 
     net['pool5'] = pool_layer('pool5', net['relu5_4'])
 
-    obj_logits = calc_obj_logits(net, vgg_layers)
-    obj_loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits)
-
-    texture_logits = calc_texture_logits(net, vgg_layers)
     texture_gram = calc_texture_gram(net)
     label_gram = calc_label_gram(net, vgg_layers)
     _, M, N = texture_gram.get_shape()
     K = 1. / (2. * N.value ** 0.5 * M.value ** 0.5)
     texture_loss = K * tf.reduce_sum(tf.pow((texture_gram - label_gram), 2))
 
+    obj_logits = calc_obj_logits(net, vgg_layers)
+    obj_loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits)
+
     loss = texture_loss + obj_loss
+
+    # Fully connected to get logits
+    texture_logits = calc_texture_logits(net, vgg_layers)
     logits = (obj_logits + texture_logits) / 2
     prediction = tf.argmax(input=logits, axis=1, name='prediction')
     acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=prediction)
@@ -297,8 +263,7 @@ def load_imgs(img_path, label):
     img_string = tf.read_file(img_path)
     img_decoded = tf.image.decode_png(img_string)
     img_resized = tf.image.resize_images(img_decoded, [img_height, img_width])
-    #    img = tf.image.grayscale_to_rgb(img_resized)
-    img = tf.image.per_image_standardization(img_resized)
+    img = tf.image.grayscale_to_rgb(img_resized)
     return img, label
 
 
@@ -344,16 +309,16 @@ def main():
 
     # The counter for tracking the number of batches
     count = 0
-    arr = []
+
     saver = tf.train.Saver(tf.trainable_variables())
-    with tf.device('/gpu:0'), tf.Session() as sess:
+    with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
 
         print('restoring model...')
         test_weight = tf.get_default_graph().get_tensor_by_name('conv1_1_w:0')
         prev = sess.run(test_weight)
-        #        saver.restore(sess, tf.train.latest_checkpoint(check_pt_path_str))
+        # saver.restore(sess, tf.train.latest_checkpoint(check_pt_path_str))
         after = sess.run(test_weight)
         # Calc difference before read and after read
         diff = after - prev
@@ -363,28 +328,39 @@ def main():
         while True:
             try:
                 train_data, train_label = sess.run(next_train_batch)
-                vali_data, vali_label = sess.run(next_vali_batch)
                 print('********************************')
                 print('processing batch:' + str(count))
                 _, _, _, channel = train_data.shape
                 if channel == 3:
-                    vali_dict = {net['input']: vali_data, net['labels']: vali_label}
-                    sess.run(acc_op, feed_dict=vali_dict)
-                    vali_acc_val = sess.run(acc, feed_dict=vali_dict)
-                    print('vali_accuracy:' + str(vali_acc_val))
+                    train_dict = {net['input']: train_data, net['labels']: train_label}
 
-                    vali_pre_lo = sess.run(loss, feed_dict=vali_dict)
-                    arr.append(np.argmax(vali_pre_lo))
-                    print('vali_pred_lo:' + str(arr))
+                    sess.run(train_op, feed_dict=train_dict)
 
-                    vali_pre_val = str(sess.run(prediction, feed_dict=vali_dict))
-                    print('vali_predic:' + vali_pre_val)
-
+                    # Update the accuracy
+                    sess.run(acc_op, feed_dict=train_dict)
+                    # Print out the accuracy value
+                    acc_val = sess.run(acc, feed_dict=train_dict)
+                    loss_val = sess.run(loss, feed_dict=train_dict)
+                    print('train_accuracy:' + str(acc_val))
+                    print('train_loss:' + str(loss_val))
+                    # Print out the prediction
+                    pre_val = str(sess.run(prediction, feed_dict=train_dict))
+                    print('train_prediction:' + pre_val)
                     # Print out the actual labels
-                    vali_actual_val = str(vali_label)
-                    print('vali_actual:' + vali_actual_val)
+                    actual_val = str(train_label)
+                    print('train_actual:' + actual_val)
 
-                if count % 50 == 0:
+                    # vali_dict = {net['input']: vali_data, net['labels']: vali_label}
+                    #
+                    # vali_pre_lo = str(sess.run(lo, feed_dict=vali_dict))
+                    # print('vali_pred_lo:' + vali_pre_lo)
+                    # vali_pre_val = str(sess.run(prediction, feed_dict=vali_dict))
+                    # print('vali_predic:' + vali_pre_val)
+                    # # Print out the actual labels
+                    # vali_actual_val = str(vali_label)
+                    # print('vali_actual:' + vali_actual_val)
+
+                if count % 10 == 0:
                     print('********************************')
                     print("saving checkpoint to '" + check_pt_path_str + "'")
                     saver.save(sess, check_pt_path_str + 'model.ckpt')
