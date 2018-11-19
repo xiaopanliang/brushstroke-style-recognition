@@ -2,13 +2,10 @@ import math
 import numpy as np
 import scipy.io
 import cv2
-from multiprocessing import Process
+import matplotlib.pyplot as plt
+from threading import Thread
 import matlab.engine
 import os
-import timeit
-
-
-expected_styles = {'Impressionism'}
 
 
 def is_valid_pt(point, max_height, max_width):
@@ -147,15 +144,10 @@ def filter_branches(branching_point_map):
     return is_severely_branched, merged_branch_set
 
 
-def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_folder_):
-    eng = matlab.engine.start_matlab()
-    eng.addpath('mat_scripts/')
+def extracting_brush_strokes(_eng_, _ori_file_names_, _result_file_names_):
     for painting_name, result_name in zip(_ori_file_names_, _result_file_names_):
-        print('processing ' + painting_name)
-        start = timeit.default_timer()
-
-        eng.edgedetection('./' + painting_name, './' + _thread_tmp_folder_, nargout=0)
-        mat = scipy.io.loadmat(_thread_tmp_folder_ + 'step1_edgelist.mat')
+        _eng_.edgedetection(painting_name, nargout=0)
+        mat = scipy.io.loadmat('./Alpha/step1_edgelist.mat')
         edge_list = mat['edgelist'][0][2][0]
         height = mat['edgelist'][0][0][0]
         width = mat['edgelist'][0][1][0]
@@ -163,8 +155,8 @@ def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_
         for _edge in edge_list:
             for _pixel in _edge:
                 img[_pixel[0] - 1][_pixel[1] - 1] = 1
-        # plt.imshow(img, cmap='gray')
-        # plt.show()
+        plt.imshow(img, cmap='gray')
+        plt.show()
         # TODO: (354, 417)
         # ((354, 417), (357, 415))
         new_edges_gen = find_nearest(edge_list, height, width)
@@ -175,12 +167,12 @@ def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_
                 point2 = _edge[index + 1]
                 point2 = (point2[1], point2[0])
                 img = cv2.line(img, point1, point2, 1, 1)
-        scipy.io.savemat(_thread_tmp_folder_ + 'step1_img', {'im2': img})
-        eng.step2('./' + _thread_tmp_folder_, nargout=0)
+        scipy.io.savemat('../edge/Alpha/step1_img', {'im2': img})
+        _eng_.step2(nargout=0)
 
-        branching_point_mat = scipy.io.loadmat(_thread_tmp_folder_ + 'step2_junction.mat')
+        branching_point_mat = scipy.io.loadmat('./Alpha/step2_junction.mat')
         _branching_points = branching_point_mat['junction'][0]
-        edge_mat = scipy.io.loadmat(_thread_tmp_folder_ + 'step2_theedgelist.mat')
+        edge_mat = scipy.io.loadmat('./Alpha/step2_theedgelist.mat')
         edges = edge_mat['theedgelist'][0]
 
         # The result array will contain all valid brush stroke skeletons
@@ -208,44 +200,34 @@ def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_
         for i in range(0, len(result)):
             result[i] = list(result[i])
 
-        scipy.io.savemat(_thread_tmp_folder_ + 'step3_severely_branch', {'severely_branch': severely_branch})
-        scipy.io.savemat(_thread_tmp_folder_ + 'step3_result.mat', {'result': result})
+        scipy.io.savemat('../edge/Alpha/step3_severely_branch', {'severely_branch': severely_branch})
+        scipy.io.savemat('../edge/Alpha/step3_result.mat', {'result': result})
 
-        eng.after_first_judge('./' + result_name[:-4] + '.png', './' + _thread_tmp_folder_, nargout=0)
-
-        stop = timeit.default_timer()
-        print('running time:' + str(stop - start) + 's')
-    eng.quit()
+        _eng_.after_first_judge(result_name, nargout=0)
 
 
 def main():
-    cores = 8
+    eng = matlab.engine.start_matlab()
+    eng.addpath('../edge/Alpha')
+    eng = matlab.engine.start_matlab()
 
-    base = 'output/step3/'  # TODO: this line should be adjusted to match with the path
-    output_folder = 'output/step4/'
+    base = 'input/wikipainting/'  # TODO: this line should be adjusted to match with the path
+    output_folder = 'output/'
 
     folders = os.listdir(base)
 
     ori_file_names = []
     result_file_names = []
     for folder in folders:
-        if folder != '.DS_Store' and folder in expected_styles:
+        if folder != '.DS_Store':
             if not os.path.isdir(output_folder + folder):
                 os.makedirs(output_folder + folder)
-            for file in os.listdir(output_folder + folder + '/'):
-                if file != '.DS_Store' and not os.path.isfile(base + folder + '/' + file):
-                    ori_file_names.append(base + folder + '/' + file)
-                    result_file_names.append(output_folder + folder + '/' + file)
+            for file in os.listdir(base + folder + '/'):
+                ori_file_names.append(base + folder + '/' + file)
+                result_file_names.append(output_folder + folder + '/' + file)
 
+    cores = 4
     num_files_per_core = round(len(ori_file_names) / cores)
-
-    # Create folders for different threads
-    thread_tmp_folders = []
-    for i in range(0, cores):
-        path = 'tmp/thread_' + str(i) + '/'
-        if not os.path.exists(path):
-            os.makedirs(path)
-        thread_tmp_folders.append(path)
 
     ori_groups = []
     result_groups = []
@@ -265,8 +247,7 @@ def main():
     for i in range(0, cores):
         ori_group = ori_groups[i]
         result_group = result_groups[i]
-        thread = Process(target=extracting_brush_strokes,
-                         args=(ori_group, result_group, thread_tmp_folders[i]))
+        thread = Thread(target=extracting_brush_strokes, args=(eng, ori_group, result_group))
         print('starting the extracting brush stroke thread ' + str(i))
         thread.start()
         threads.append(thread)

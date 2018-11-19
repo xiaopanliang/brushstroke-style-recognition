@@ -17,3 +17,6 @@ __pycache__/
 *.pyc
 wikiart/
 *.npz
+venv/
+checkpoint*/
+!(*.py)
