@@ -8,9 +8,11 @@ import numpy as np
 import cv2
 from scipy.sparse.linalg import cg
 from hashtable import hashtable
+from numba import vectorize
 import time
 
 
+# @vectorize(['float64(uint8,int32,int32,int32)'],target = 'cuda')
 def super_resolution_train(mat, Qangle, Qstrenth, Qcoherence):
     Q = np.zeros((Qangle * Qstrenth * Qcoherence, 4, 11 * 11, 11 * 11))
     V = np.zeros((Qangle * Qstrenth * Qcoherence, 4, 11 * 11, 1))
@@ -41,18 +43,34 @@ def main():
     Qstrenth = 3
     Qcoherence = 3
 
-    base = 'input/wikipainting/'
+    base = './Alpha/wikipainting/'
+
+    output_folder = './Alpha/output/'
+
     folders = os.listdir(base)
+
     ori_file_names = []
 
+    result_file_names = []
+
     for folder in folders:
+
+        if not os.path.isdir(output_folder + folder):
+            os.makedirs(output_folder + folder)
+
         i = 1
-        if folder != '.DS_Store':
-            for file in os.listdir(base + folder + '/'):
-                ori_file_names.append(base + folder + '/' + file)
-                i = i + 1
-                if i >= 11:
-                    break
+
+        for file in os.listdir(base + folder + '/'):
+
+            ori_file_names.append(base + folder + '/' + file)
+
+            result_file_names.append(output_folder + folder + '/' + file)
+
+            i = i + 1
+
+            if i >= 11:
+                break
+
     fileList = []
 
     for painting_name in ori_file_names:
@@ -60,19 +78,13 @@ def main():
 
     # for i in range(0,2) for the color channel, here we only try to process the channel 2 for simplification
     for file in fileList:
-        try:
-            print('processing ' + file)
-            mat = cv2.imread(file)
-            h = super_resolution_train(mat, Qangle, Qstrenth, Qcoherence)
-        except:
-            print('error happens on processing ' + file)
+        mat = cv2.imread(file)
+        h = super_resolution_train(mat, Qangle, Qstrenth, Qcoherence)
     print("Train is off")
-    np.save("lowR2", h)
-    _elapsed_ = time.time() - t
-    return _elapsed_
+    np.save("./lowR2", h)
+    elapsed = time.time() - t
+    return elapsed
 
 
 if __name__ == '__main__':
-    print('starting RAISR_train...')
-    elapsed = main()
-    print('finished RAISR train: ' + str(elapsed) + 's')
+    main()

@@ -74,7 +74,6 @@ def sort_pixels(img):
 if __name__ == '__main__':
     img = cv2.imread("henri-edmond-cross_a-garden-in-provence-1901.jpg")
     img = cv2.resize(img, (512, 512))  # The image is read as BGR format
-    height, width, _ = img.shape
     blue_channel = img[:, :, 0]
     green_channel = img[:, :, 1]
     red_channel = img[:, :, 2]
@@ -87,15 +86,7 @@ if __name__ == '__main__':
     #               [41, 42, 43, 44, 45, 46, 47, 48],
     #               [49, 50, 51, 52, 53, 54, 55, 56]])
     blue_channel_result = sort_pixels(blue_channel)
-    blue_channel_result = np.reshape(blue_channel_result, [height, width, 1])
-
     green_channel_result = sort_pixels(green_channel)
-    green_channel_result = np.reshape(green_channel_result, [height, width, 1])
-
     red_channel_result = sort_pixels(red_channel)
-    red_channel_result = np.reshape(red_channel_result, [height, width, 1])
-
-    result = np.concatenate((red_channel_result, green_channel_result), axis=2)
-    result = np.concatenate((result, blue_channel_result), axis=2)
-
-    cv2.imwrite("copy.jpg", result)
+    # cv2.imwrite("copy.jpg", result)
+    # print(result)
