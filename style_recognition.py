@@ -1,10 +1,9 @@
 import tensorflow as tf
 import numpy as np
 import scipy.io
-import matplotlib.pyplot as plt
 import math
 
-check_pt_path_str = 'checkpointF1/'
+check_pt_path_str = '/checkpointrandombrush'
 batch_size = 16
 img_height = 64
 img_width = 64
@@ -231,9 +230,9 @@ def get_vali_iterator():
     return iterator
 
 
-def variable_summaries(var):
+def variable_summaries(var, name):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
-    with tf.name_scope('summaries'):
+    with tf.name_scope(name):
         mean = tf.reduce_mean(var)
         tf.summary.scalar('mean', mean)
         with tf.name_scope('stddev'):
@@ -248,8 +247,8 @@ def main():
     tf.logging.set_verbosity(tf.logging.INFO)
 
     loss, acc, acc_op, prediction, logits, lo = cnn_model_fn()
-    variable_summaries(loss)
-    variable_summaries(acc)
+    variable_summaries(loss, "loss")
+    variable_summaries(acc, "acc")
     merged_summary = tf.summary.merge_all()
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-07, use_locking=False)
@@ -268,7 +267,7 @@ def main():
     arr = []
     saver = tf.train.Saver(tf.trainable_variables())
     with tf.device('/gpu:0'), tf.Session() as sess:
-        train_writer = tf.summary.FileWriter('train/', sess.graph)
+        train_writer = tf.summary.FileWriter("graphs/", sess.graph)
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
@@ -338,12 +337,12 @@ def main():
                 #                    print('vali_actual:' + vali_actual_val)
                 ##
 
-                if count % 50 == 0:
-                    print('********************************')
-                    summary = sess.run(merged_summary)
-                    train_writer.add_summary(summary, count)
-                    print("saving checkpoint to '" + check_pt_path_str + "'")
-                    saver.save(sess, check_pt_path_str + 'model.ckpt')
+                    if count % 50 == 0:
+                        print('********************************')
+                        summary = sess.run(merged_summary, feed_dict=train_dict)
+                        train_writer.add_summary(summary, count)
+                        print("saving checkpoint to '" + check_pt_path_str + "'")
+                        saver.save(sess, check_pt_path_str + 'model.ckpt')
 
                 count += 1
             except tf.errors.OutOfRangeError:

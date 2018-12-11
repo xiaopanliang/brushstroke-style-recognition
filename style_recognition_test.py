@@ -8,16 +8,20 @@ Created on Sun Sep 30 18:10:07 2018
 import tensorflow as tf
 import numpy as np
 import scipy.io
-#import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
 import math
+import os
+import cv2
 
-
-check_pt_path_str = 'checkpointcolor/'
+check_pt_path_str = 'checkpointrandombrush/'
 batch_size = 16
 img_height = 32*4
 img_width = 32*4
-epochs = 1500
+epochs = 1000
 units = 10
+
 
 
 def conv_layer(name, layer_input, w):
@@ -53,10 +57,11 @@ def calc_texture_logits(net):
     layers = ['relu1_2', 'relu2_2', 'relu3_4', 'relu4_4', 'relu5_4']
     style_layer_weights = [0.05, 0.05, 0.2, 0.3, 0.4]
     connected_G = None
+    n = 0
 #    for layer in layers:
     for layer, weight in zip(layers, style_layer_weights):
         layer_data = net[layer]
-        _, height, width, channels = layer_data.get_shape()
+        index, height, width, channels = layer_data.get_shape()
         M = height.value * width.value
         N = channels.value
         F = tf.reshape(layer_data, [-1, M, N])
@@ -67,6 +72,11 @@ def calc_texture_logits(net):
 #        VarMatrix = tf.matmul(tf.transpose(variance,perm=[0,2,1]), variance)
 #        G = (MeanMatrix + VarMatrix)*weight
         G = tf.matmul(tf.transpose(F,perm=[0, 2, 1]), F)*weight
+
+        # Keep recording gram matrices from different layers
+        n += 1
+        net['gram_' + str(n)] = G
+
         _,y, x = G.get_shape()
         G = tf.reshape(G, [-1, y.value * x.value])
         if connected_G is None:
@@ -194,7 +204,7 @@ def cnn_model_fn():
     obj_logits = calc_obj_logits(net)
     texture_logits = calc_texture_logits(net)
 #    Denoise_logits = calc_regularization_logits(net)
-    logits = obj_logits
+    logits =  texture_logits
     # sum_logits = logits
     sum_logit1 = tf.reduce_sum(logits[0:4,:units],0,keepdims=True)
     sum_logit2 = tf.reduce_sum(logits[4:8, :units], 0, keepdims=True)
@@ -223,6 +233,17 @@ def cnn_model_fn():
 #    tex_loss = regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     return loss, acc, acc_op, prediction,logits, texture_logits ,obj_prediction,tex_prediction, testing_prediction,testing_acc,testing_acc_op
 
+def variable_summaries(var, name):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope(name):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
 
 def load_imgs(img_path, label):
     img_string = tf.read_file(img_path)
@@ -235,8 +256,8 @@ def load_imgs(img_path, label):
 
 
 def get_train_iterator():
-    img_files = np.load('rbtrain_imgs.npy')
-    labels = np.load('rbtrain_lbs.npy')
+    img_files = np.load('train_imgs.npy')
+    labels = np.load('train_lbs.npy')
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.shuffle(20000)
     dataset = dataset.repeat(epochs)
@@ -267,11 +288,56 @@ def get_eval_iterator():
     iterator = dataset.make_one_shot_iterator()
     return iterator
 
+
+# The function gets the layer output of the neural network
+# Param:
+# layer: this is the string which tells which layer output should be obtained
+def get_layer_output(sess, net, layer, data_batch, label_batch):
+    imgs_out = net[layer]
+    imgs_out = sess.run(imgs_out, feed_dict={net['input']: data_batch,
+                                             net['labels']: label_batch})
+    base = 'layer_output/'
+    if layer[:4] != 'gram':
+        # Enumerate different images
+        for n, data in enumerate(zip(label_batch, imgs_out)):
+            style = data[0]
+            directory = base + layer + '/' + str(style) + '/' + str(n) + '/'
+            if not os.path.isdir(directory):
+                os.makedirs(directory)
+            img_data = data[1]
+            height, width, depth = img_data.shape
+            for channel in range(depth):
+                channel_output = (img_data[:, :, channel]).astype(np.uint8)
+                fig = plt.imshow(channel_output, cmap='gray')
+                plt.axis('off')
+                fig.axes.get_xaxis().set_visible(False)
+                fig.axes.get_yaxis().set_visible(False)
+                plt.savefig(directory + str(channel) + '.png', bbox_inches='tight', pad_inches=0)
+    else:
+        # Enumerate different images
+        for n, data in enumerate(zip(label_batch, imgs_out)):
+            style = data[0]
+            directory = base + layer + '/' + str(style) + '/'
+            if not os.path.isdir(directory):
+                os.makedirs(directory)
+            img_out = data[1]
+            # Output data for different color channels
+            channel_output = img_out.astype(np.uint8)
+            fig = plt.imshow(channel_output, cmap='gray')
+            plt.axis('off')
+            fig.axes.get_xaxis().set_visible(False)
+            fig.axes.get_yaxis().set_visible(False)
+            plt.savefig(directory + str(n) + '.png', bbox_inches='tight', pad_inches=0)
+
+
 def main():
     tf.logging.set_verbosity(tf.logging.INFO)
 
     loss, acc, acc_op, prediction,logits,obj_logits,obj_prediction,tex_prediction,testing_prediction,testing_acc,testing_acc_op = cnn_model_fn()
-    
+
+    variable_summaries(loss, "loss")
+    variable_summaries(acc, "acc")
+    merged_summary = tf.summary.merge_all()
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.00001,epsilon=1e-08,use_locking=False)
  
@@ -282,19 +348,22 @@ def main():
     itr_train = get_train_iterator()
     next_train_batch = itr_train.get_next()
     
-    itr_vali = get_vali_iterator()
-    next_vali_batch = itr_vali.get_next()
-
-    itr_eval = get_eval_iterator()
-    next_eval_batch = itr_eval.get_next()
+    # itr_vali = get_vali_iterator()
+    # next_vali_batch = itr_vali.get_next()
+    #
+    # itr_eval = get_eval_iterator()
+    # next_eval_batch = itr_eval.get_next()
 
     # The counter for tracking the number of batches
     count = 0
     arr = []
     saver = tf.train.Saver(tf.trainable_variables())
     with tf.device('/gpu:0'), tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer())
+        # train_writer = tf.summary.FileWriter("train_graphs/", sess.graph)
+        # eval_writer = tf.summary.FileWriter("eval_graphs/", sess.graph)
+        # vali_writer = tf.summary.FileWriter("vali_graphs/", sess.graph)
+        # sess.run(tf.global_variables_initializer())
+        # sess.run(tf.local_variables_initializer())
 
         print('restoring model...')
 #        test_weight = tf.get_default_graph().get_tensor_by_name('conv1_1_w:0')
@@ -308,62 +377,81 @@ def main():
 
         while True: 
             train_data, train_label = sess.run(next_train_batch)
-            eval_data, eval_label = sess.run(next_eval_batch)
-            vali_data, vali_label = sess.run(next_vali_batch)
+            # eval_data, eval_label = sess.run(next_eval_batch)
+            # vali_data, vali_label = sess.run(next_vali_batch)
 
             print('********************************')
             print('processing batch:' + str(count))
             _, _, _, channel =  train_data.shape
             if channel == 3:
-                for _ in range(100):
-                    train_dict = {net['input']:  train_data, net['labels']:  train_label}
-##                        # Train the model
-                    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                    with tf.control_dependencies(update_ops):
-                        loss_val = sess.run(loss, feed_dict=train_dict)
-                        print('loss:' + str(loss_val))
-                        if loss_val < 0.1:
-                            break
-                        if math.isnan(loss_val):
-                            return
-                        sess.run(train_op, feed_dict=train_dict)
-# #
+#                 for _ in range(100):
+#                     train_dict = {net['input']:  train_data, net['labels']:  train_label}
+# ##                        # Train the model
+#                     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+#                     with tf.control_dependencies(update_ops):
+#                         loss_val = sess.run(loss, feed_dict=train_dict)
+#                         print('loss:' + str(loss_val))
+#                         if loss_val < 0.1:
+#                             break
+#                         if math.isnan(loss_val):
+#                             return
+#                         sess.run(train_op, feed_dict=train_dict)
+# # #
+                train_dict = {net['input']: train_data, net['labels']: train_label}
                 train_pre_val = str(sess.run(prediction, feed_dict=train_dict))
                 print('train_predic:' + train_pre_val)
 #                    Print out the actual labels
                 train_actual_val = str( train_label)
                 print('train_actual' + train_actual_val)
+
+                # get_layer_output(sess, net, 'relu1_2', train_data, train_label)
+                get_layer_output(sess, net, 'relu2_2', train_data, train_label)
+                # get_layer_output(sess, net, 'relu3_4', train_data, train_label)
+                # get_layer_output(sess, net, 'relu4_4', train_data, train_label)
+                # get_layer_output(sess, net, 'relu5_4', train_data, train_label)
+                # get_layer_output(sess, net, 'gram_1', train_data, train_label)
+                # get_layer_output(sess, net, 'gram_2', train_data, train_label)
+                # get_layer_output(sess, net, 'gram_3', train_data, train_label)
+                # get_layer_output(sess, net, 'gram_4', train_data, train_label)
+                # get_layer_output(sess, net, 'gram_5', train_data, train_label)
+                break
 #
 #                 ##                     Print out the accuracy value
-                eval_dict = {net['input']: eval_data, net['labels']: eval_label}
-                sess.run(testing_acc_op, feed_dict=eval_dict)
-                eval_acc_val = sess.run(testing_acc, feed_dict=eval_dict)
-                print('eval_accuracy:' + str(eval_acc_val))
+#                 eval_dict = {net['input']: eval_data, net['labels']: eval_label}
+#                 sess.run(testing_acc_op, feed_dict=eval_dict)
+#                 eval_acc_val = sess.run(testing_acc, feed_dict=eval_dict)
+#                 print('eval_accuracy:' + str(eval_acc_val))
+#
+#                 eval_pre_val = str(sess.run(testing_prediction, feed_dict=eval_dict))
+#                 print('eval_predic:' + eval_pre_val)
+#
+#
+#                 # Print out the actual labels
+#                 eval_actual_val = str(eval_label)
+#                 print('eval_actual:' + eval_actual_val)
 
-                eval_pre_val = str(sess.run(testing_prediction, feed_dict=eval_dict))
-                print('eval_predic:' + eval_pre_val)
+# ##                     Print out the accuracy value
+#                 vali_dict = {net['input']: vali_data, net['labels']: vali_label}
+#                 sess.run(testing_acc_op, feed_dict=vali_dict)
+#                 vali_acc_val = sess.run(testing_acc, feed_dict=vali_dict)
+#                 print('vali_accuracy:' + str(vali_acc_val))
+#
+#                 vali_pre_val = str(sess.run(testing_prediction, feed_dict=vali_dict))
+#                 print('vali_predic:' + vali_pre_val)
+#                 # Print out the actual labels
+#                 vali_actual_val = str(vali_label)
+#                 print('vali_actual:' + vali_actual_val)
 
-
-                # Print out the actual labels
-                eval_actual_val = str(eval_label)
-                print('eval_actual:' + eval_actual_val)
-
-##                     Print out the accuracy value
-                vali_dict = {net['input']: vali_data, net['labels']: vali_label}
-                sess.run(testing_acc_op, feed_dict=vali_dict)
-                vali_acc_val = sess.run(testing_acc, feed_dict=vali_dict)
-                print('vali_accuracy:' + str(vali_acc_val))
-
-                vali_pre_val = str(sess.run(testing_prediction, feed_dict=vali_dict))
-                print('vali_predic:' + vali_pre_val)
-                # Print out the actual labels
-                vali_actual_val = str(vali_label)
-                print('vali_actual:' + vali_actual_val)
-
-            if count % 50 == 0:
-                print('********************************')
-                print("saving checkpoint to '" + check_pt_path_str + "'")
-                saver.save(sess, check_pt_path_str + 'model.ckpt')
+            # if count % 88 == 0:
+            #     print('********************************')
+            #     summary = sess.run(merged_summary, feed_dict=train_dict)
+            #     train_writer.add_summary(summary, count)
+            #     summary = sess.run(merged_summary, feed_dict=eval_dict)
+            #     eval_writer.add_summary(summary, count)
+            #     summary = sess.run(merged_summary, feed_dict=vali_dict)
+            #     vali_writer.add_summary(summary, count)
+            #     print("saving checkpoint to '" + check_pt_path_str + "'")
+            #     saver.save(sess, check_pt_path_str + 'model.ckpt')
 
             count += 1
 
