@@ -91,38 +91,38 @@ def merge_back(_dir_, output):
                 except:
                         img_data.append(None)
                         sizes.append((0, 0, 0))
-        #        total_height = 0
+            total_height = 0
             is_row_valid = [False, False, False, False]
             widths = [0, 0, 0, 0]
             heights = [0, 0, 0, 0]
             is_col_valid = [False, False, False, False]
-        #        total_width = 0
+            total_width = 0
             i = 0
             # The loop below is for calculating the size of the original image
             col = 0
-        #        while i < len(sizes):
-        #            sub_array = sizes[i:i + 4]  # This is the array for one row
-        #            for n, shape in enumerate(sub_array):
-        #                if not is_row_valid[n]:
-        #                    height, width, _ = shape
-        #                    if width != 0:
-        #                        is_row_valid[n] = True
-        #                        widths[n] = width
-        #                        total_width += width                                
-        #                if not is_col_valid[col]:
-        #                    height, width, _ = shape
-        #                    if height != 0:
-        #                        is_col_valid[col] = True
-        #                        heights[col] = height
-        #                        total_height += height
-        #                    else:
-        #                        for j in range (1,col):
-        #                            if heights[col-j] != 0:
-        #                                is_col_valid[col] = True
-        #                                heights[col] = height[col-j]
-        #                                total_height += height[col-j]
-        #            i += 4
-        #            col += 1
+            while i < len(sizes):
+                sub_array = sizes[i:i + 4]  # This is the array for one row
+                for n, shape in enumerate(sub_array):
+                    if not is_row_valid[n]:
+                        height, width, _ = shape
+                        if width != 0:
+                            is_row_valid[n] = True
+                            widths[n] = width
+                            total_width += width                                
+                    if not is_col_valid[col]:
+                        height, width, _ = shape
+                        if height != 0:
+                            is_col_valid[col] = True
+                            heights[col] = height
+                            total_height += height
+                        else:
+                            for j in range (1,col):
+                                if heights[col-j] != 0:
+                                    is_col_valid[col] = True
+                                    heights[col] = height[col-j]
+                                    total_height += height[col-j]
+                i += 4
+                col += 1
             empty_img = np.zeros(shape=[total_height, total_width, 3])
             row = 0
             col = 0
