@@ -4,5 +4,5 @@ function edgedetection(image, thread_tmp_dir)
     y = edge(x,'Canny',[0.02,0.04]);
     [edgelist, ~] = edgelink(y,10,0);
     edgelist = {size(x,1),size(x,2),edgelist};
-    save(strcat(thread_tmp_dir, 'step1_edgelist.mat'),'edgelist');
+    save(strcat(thread_tmp_dir, 'step1_edgelist.mat'),'edgelist','-v6');
 end

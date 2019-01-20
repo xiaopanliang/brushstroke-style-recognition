@@ -8,9 +8,6 @@ import os
 import timeit
 
 
-expected_styles = {'Realism'}
-
-
 def is_valid_pt(point, max_height, max_width):
     return (0 <= point[0] < max_height) and (0 <= point[1] < max_width)
 
@@ -208,6 +205,9 @@ def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_
         for i in range(0, len(result)):
             result[i] = list(result[i])
 
+        if len(result) == 1:
+            result.append([(0, 0)])
+
         scipy.io.savemat(_thread_tmp_folder_ + 'step3_severely_branch', {'severely_branch': severely_branch})
         scipy.io.savemat(_thread_tmp_folder_ + 'step3_result.mat', {'result': result})
 
@@ -219,28 +219,23 @@ def extracting_brush_strokes(_ori_file_names_, _result_file_names_, _thread_tmp_
 
 
 def main():
+    cores = 1
 
-    cores = 8
-
-    base = 'imgs/'  # TODO: this line should be adjusted to match with the path
-    output_folder = 'step4store/'
+    base = 'output/tmp3/'  # TODO: this line should be adjusted to match with the path
+    output_folder = 'output/tmp4/'
 
     folders = os.listdir(base)
 
     ori_file_names = []
     result_file_names = []
     for folder in folders:
-        if folder != '.DS_Store' and folder in expected_styles:
-            print(folder)
+        if folder != '.DS_Store':
             if not os.path.isdir(output_folder + folder):
                 os.makedirs(output_folder + folder)
-            printCount = 0
             for file in os.listdir(base + folder + '/'):
-                if file != '.DS_Store' and not os.path.isfile(output_folder + folder + '/' + file):
+                if file != '.DS_Store':
                     ori_file_names.append(base + folder + '/' + file)
                     result_file_names.append(output_folder + folder + '/' + file)
-                if file == "albert-anker_bathers-18656.png":
-                    print(file)
 
     num_files_per_core = round(len(ori_file_names) / cores)
 
@@ -282,5 +277,8 @@ def main():
 
 if __name__ == '__main__':
     print('starting the brush stroke extraction...')
+    start = timeit.default_timer()
     main()
+    stop = timeit.default_timer()
     print('finished brush stroke extraction')
+    print('total running time:' + str(stop - start) + 's')
