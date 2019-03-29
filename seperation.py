@@ -46,9 +46,9 @@ def main(argv):
                     img_data = cv2.imread(argv[1] + "/" + style + "/" + img)
                     croped_imgs = crop_imgs(img_data)
                     for n, croped_img in enumerate(croped_imgs):
-                        file_name = output + "/" + style + "/" + img[:-4] + "_" + str(n) + ".png"
+                        file_name = output + "/" + style + "/" + \
+                            img[:-4] + "_" + str(n) + ".png"
                         cv2.imwrite(file_name, croped_img)
-            break
 
 
 if __name__ == '__main__':

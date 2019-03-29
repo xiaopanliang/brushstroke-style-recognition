@@ -21,3 +21,4 @@ venv/
 checkpoint*/
 !(*.py)
 .vscode
+cropedImages/
