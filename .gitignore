@@ -20,3 +20,4 @@ wikiart/
 venv/
 checkpoint*/
 !(*.py)
+.vscode

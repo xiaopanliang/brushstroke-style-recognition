@@ -5,32 +5,24 @@ import collections
 import matplotlib.pyplot as plt
 
 
+style = "Ukiyo_e"
+
+
 def merge_back(_dir_, output):
-    files = os.listdir(_dir_)
-    files.sort()
     groups = []
-    tmp_name = files[0][:-5]
-    tmp_group = []
-    for file in files:
-        if file[:-5] == tmp_name:
-            # same img
-            file = file[:-5] + '_' + file[-5:]
-            tmp_group.append(file)
-        elif file[:-6] == tmp_name:
-            # same img
-            file = file[:-6] + '_' + file[-6:]
-            tmp_group.append(file)
-        else:
-            # another image
-            # clear the array
-            groups.append(tmp_group)
-            tmp_group = []
-            tmp_name = file[:-5]
-            file = file[:-5] + '_' + file[-5:]
-            tmp_group.append(file)
+
+    f = open("img_names/img_names_" + style + ".txt", "r")
+    for file in f:
+        tmp_list = []
+        for n in range(16):
+            name = file[:-5] + "_" + str(n) + ".png"
+            tmp_list.append(name)
+        groups.append(tmp_list)
+
     if not os.path.isdir(output):
         os.mkdir(output)
     # Each group contain 16 pieces of the original image
+    f = open("missed_imgs", "w")
     for num, group in enumerate(groups):
         img_map = {}
         for file in group:
@@ -44,6 +36,7 @@ def merge_back(_dir_, output):
         sizes = []
         name_formed = False
         file_name = ''
+
         for _, img_name in img_map.items():
             if img_name != '0':
                 index = img_name.rfind('_')
@@ -52,11 +45,15 @@ def merge_back(_dir_, output):
                     name_formed = True
                     file_name = img_name[:index] + ".jpg"
                 data = cv2.imread(read_path)
-                img_data.append(data)
-                sizes.append(data.shape)
+                if data is None:
+                    f.write(img_name + "\n")
+                else:
+                    img_data.append(data)
+                    sizes.append(data.shape)
             else:
                 img_data.append(None)
                 sizes.append((0, 0, 0))
+
         total_height = 0
         is_row_valid = [False, False, False, False]
         widths = [0, 0, 0, 0]
@@ -106,6 +103,7 @@ def merge_back(_dir_, output):
                 col = 0
         cv2.imwrite(output + file_name, empty_img)
         print('write ' + file_name)
+    f.close()
 
 
-merge_back('TEST/', 'MERGED/')
+merge_back('output/' + style + '/', 'output/brushstrokes/' + style + '/')
