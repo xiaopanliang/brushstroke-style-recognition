@@ -366,6 +366,7 @@ def main():
                     sess.run(train_op, feed_dict=train_dict)
             count += 1
             if count % 50:
+                print("saving checkpoint...")
                 saver.save(sess, check_pt_path_str + '/model.ckpt')
 
 
