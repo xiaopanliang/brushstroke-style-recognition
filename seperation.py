@@ -32,6 +32,17 @@ def crop_imgs(img):
     return croped
 
 
+def start_croping(imgs, input_dir, output_dir):
+    for img in imgs:
+        if img != ".DS_Store":
+            img_data = cv2.imread(input_dir + "/" + img)
+            croped_imgs = crop_imgs(img_data)
+            for n, croped_img in enumerate(croped_imgs):
+                file_name = output_dir + "/" + \
+                    img[:-4] + "_" + str(n) + ".png"
+                cv2.imwrite(file_name, croped_img)
+
+
 def main(argv):
     output = 'cropedImages'
     if not os.path.exists(output):
@@ -44,14 +55,20 @@ def main(argv):
                 os.makedirs(output + "/" + style)
             # Get imgs for each style
             imgs = os.listdir(argv[1] + "/" + style)
-            for img in imgs:
-                if img != ".DS_Store":
-                    img_data = cv2.imread(argv[1] + "/" + style + "/" + img)
-                    croped_imgs = crop_imgs(img_data)
-                    for n, croped_img in enumerate(croped_imgs):
-                        file_name = output + "/" + style + "/" + \
-                            img[:-4] + "_" + str(n) + ".png"
-                        cv2.imwrite(file_name, croped_img)
+            # Shuffle imgs
+            random.shuffle(imgs)
+            train_imgs = imgs[:450]
+            eval_imgs = imgs[450:500]
+            train_set_output_dir = output + "/" + style + "/train_set"
+            eval_set_output_dir = output + "/" + style + "/eval_set"
+            # Create test set folder and folder for storing imgs
+            if not os.path.exists(train_set_output_dir):
+                os.makedirs(train_set_output_dir)
+            if not os.path.exists(eval_set_output_dir):
+                os.makedirs(eval_set_output_dir)
+            input_dir = argv[1] + "/" + style
+            start_croping(train_imgs, input_dir, train_set_output_dir)
+            start_croping(eval_imgs, input_dir, eval_set_output_dir)
 
 
 if __name__ == '__main__':
