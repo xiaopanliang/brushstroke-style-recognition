@@ -323,58 +323,37 @@ def main():
 
     loss, acc, acc_op, prediction, logits, texture_logits, obj_prediction, tex_prediction, testing_prediction, testing_acc, testing_acc_op = cnn_model_fn()
 
-    # variable_summaries(loss, "loss")
-    # variable_summaries(acc, "acc")
-    # merged_summary = tf.summary.merge_all()
-
     optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-08, use_locking=False)
 
     train_op = optimizer.minimize(loss)
-    #    train_op2 = optimizer.minimize(tex_loss)
 
     # Get the iterator for the data set
     itr_train = get_train_iterator()
     next_train_batch = itr_train.get_next()
 
-    # itr_vali = get_vali_iterator()
-    # next_vali_batch = itr_vali.get_next()
-    #
     itr_eval = get_eval_iterator()
     next_eval_batch = itr_eval.get_next()
 
     # The counter for tracking the number of batches
     count = 0
     arr = []
-    saver = tf.train.Saver(tf.trainable_variables())
-    with tf.device('/gpu:0'), tf.Session() as sess:
-        # train_writer = tf.summary.FileWriter("train_graphs/", sess.graph)
-        # eval_writer = tf.summary.FileWriter("eval_graphs/", sess.graph)
-        # vali_writer = tf.summary.FileWriter("vali_graphs/", sess.graph)
+    with tf.Session() as sess:
+
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
-
-        print('restoring model...')
-        #        test_weight = tf.get_default_graph().get_tensor_by_name('conv1_1_w:0')
-        #        prev = sess.run(test_weight)
-        #saver.restore(sess, tf.train.latest_checkpoint(check_pt_path_str))
-        #        after = sess.run(test_weight)
-        # Calc difference before read and after read
-        #        diff = after - prev
-        #        diff = diff.sum()
-        #        print('restored:' + str(diff))
 
         while True:
             train_data, train_label = sess.run(next_train_batch)
             eval_data, eval_label = sess.run(next_eval_batch)
-            # vali_data, vali_label = sess.run(next_vali_batch)
 
             print('********************************')
             print('processing batch:' + str(count))
             _, _, _, channel = train_data.shape
+
             if channel == 3:
                 for _ in range(100):
                     train_dict = {net['input']:  train_data, net['labels']:  train_label}
-                   # Train the model
+                    # Train the model
                     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                     with tf.control_dependencies(update_ops):
                          loss_val = sess.run(loss, feed_dict=train_dict)
@@ -384,61 +363,6 @@ def main():
                          if math.isnan(loss_val):
                              return
                          sess.run(train_op, feed_dict=train_dict)
-                # # #
-                # train_dict = {net['input']: train_data, net['labels']: train_label}
-                # train_pre_val = str(sess.run(prediction, feed_dict=train_dict))
-                # print('train_predic:' + train_pre_val)
-                # # # Print out the actual labels
-                # train_actual_val = str(train_label)
-                # print('train_actual' + train_actual_val)
-
-                # get_layer_output(sess, net, 'relu1_2', train_data, train_label)
-                #get_layer_output(sess, net, 'relu2_2', train_data, train_label)
-                # get_layer_output(sess, net, 'relu3_4', train_data, train_label)
-                # get_layer_output(sess, net, 'relu4_4', train_data, train_label)
-                # get_layer_output(sess, net, 'relu5_4', train_data, train_label)
-                # get_layer_output(sess, net, 'gram_1', train_data, train_label)
-                # get_layer_output(sess, net, 'gram_2', train_data, train_label)
-                # get_layer_output(sess, net, 'gram_3', train_data, train_label)
-                # get_layer_output(sess, net, 'gram_4', train_data, train_label)
-                # get_layer_output(sess, net, 'gram_5', train_data, train_label)
-                # break
-            #
-            #   print out the accuracy value
-                eval_dict = {net['input']: eval_data, net['labels']: eval_label}
-                sess.run(testing_acc_op, feed_dict=eval_dict)
-                eval_acc_val = sess.run(testing_acc, feed_dict=eval_dict)
-                print('eval_accuracy:' + str(eval_acc_val))
-                eval_pre_val = str(sess.run(testing_prediction, feed_dict=eval_dict))
-                print('eval_predic:' + eval_pre_val)
-                # Print out the actual labels
-                eval_actual_val = str(eval_label)
-                print('eval_actual:' + eval_actual_val)
-
-            # ##                     Print out the accuracy value
-            #                 vali_dict = {net['input']: vali_data, net['labels']: vali_label}
-            #                 sess.run(testing_acc_op, feed_dict=vali_dict)
-            #                 vali_acc_val = sess.run(testing_acc, feed_dict=vali_dict)
-            #                 print('vali_accuracy:' + str(vali_acc_val))
-            #
-            #                 vali_pre_val = str(sess.run(testing_prediction, feed_dict=vali_dict))
-            #                 print('vali_predic:' + vali_pre_val)
-            #                 # Print out the actual labels
-            #                 vali_actual_val = str(vali_label)
-            #                 print('vali_actual:' + vali_actual_val)
-
-            # if count % 88 == 0:
-            #     print('********************************')
-            #     summary = sess.run(merged_summary, feed_dict=train_dict)
-            #     train_writer.add_summary(summary, count)
-            #     summary = sess.run(merged_summary, feed_dict=eval_dict)
-            #     eval_writer.add_summary(summary, count)
-            #     summary = sess.run(merged_summary, feed_dict=vali_dict)
-            #     vali_writer.add_summary(summary, count)
-            #     print("saving checkpoint to '" + check_pt_path_str + "'")
-            #     saver.save(sess, check_pt_path_str + 'model.ckpt')
-
-            # count += 1
 
 
 if __name__ == "__main__":
