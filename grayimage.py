@@ -5,22 +5,15 @@ Created on Fri Oct 19 10:35:55 2018
 @author: jpansh
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Oct 15 09:18:40 2018
-
-@author: jpansh
-"""
-
 import os
 import cv2
 import numpy as np
-#from threading import Thread
-# import matplotlib.image as mpimg
+
 
 input_height = 512  # 768
 input_width = 512  # 1024
 rate = 4
+
 
 # Limit the size of the message to be within the max_size
 def resize_content_img(img):

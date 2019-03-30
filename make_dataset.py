@@ -1,9 +1,5 @@
 import os
-import cv2
 import numpy as np
-#from threading import Thread
-#import matplotlib.image as mpimg
-import random
 
 
 def main():
@@ -24,7 +20,6 @@ def main():
         if folder != 'aa':
             files = os.listdir(base + folder + '/')
             files = files[:1760]
-#            files_num = len(files)
             train_set_num = int(1408-176)
             eval_set_num = int(1408)
             train_set = files[:train_set_num]
@@ -46,7 +41,6 @@ def main():
     np.save('rbeval_lbs', eval_labels)
     np.save('rbvali_imgs', vali_files)
     np.save('rbvali_lbs', vali_labels)
-
 
 
 if __name__ == '__main__':
