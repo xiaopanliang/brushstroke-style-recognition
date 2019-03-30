@@ -242,8 +242,8 @@ def load_imgs(img_path, label):
 
 
 def get_train_iterator():
-    img_files = np.load('rbtrain_imgs.npy')
-    labels = np.load('rbtrain_lbs.npy')
+    img_files = np.load('train_imgs.npy')
+    labels = np.load('train_lbs.npy')
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.shuffle(20000)
     dataset = dataset.repeat(epochs)
@@ -254,8 +254,8 @@ def get_train_iterator():
 
 
 def get_vali_iterator():
-    img_files = np.load('rbvali_imgs.npy')
-    labels = np.load('rbvali_lbs.npy')
+    img_files = np.load('vali_imgs.npy')
+    labels = np.load('vali_lbs.npy')
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.repeat(epochs)
     #    dataset = dataset.shuffle(12000)
@@ -266,8 +266,8 @@ def get_vali_iterator():
 
 
 def get_eval_iterator():
-    img_files = np.load('rbeval_imgs.npy')
-    labels = np.load('rbeval_lbs.npy')
+    img_files = np.load('eval_imgs.npy')
+    labels = np.load('eval_lbs.npy')
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.repeat(epochs)
     #    dataset = dataset.shuffle(12000)
