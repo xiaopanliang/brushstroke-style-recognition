@@ -5,41 +5,6 @@ import numpy as np
 #import matplotlib.image as mpimg
 import random
 
-input_height = 500  # 768
-input_width = 500  # 1024
-
-
-# Limit the size of the message to be within the max_size
-def resize_content_img(img):
-    return cv2.resize(img, dsize=(input_height, input_width), interpolation=cv2.INTER_AREA)
-
-
-def read_image(path):
-    _img_ = cv2.imread(path)
-    return _img_.astype(np.float32)
-
-
-def load_content_img(path):
-    _img_ = read_image(path)
-    _img_ = resize_content_img(_img_)
-    # show_img = img.astype(np.uint8)
-    # plt.imshow(show_img)
-    # plt.show()
-    return _img_
-
-
-def load_image_data_thread(files, return_vals):
-    _img_data_ = []
-    for _file_ in files:
-        try:
-            _img_ = load_content_img(_file_)
-            if _img_.shape == (500, 500):
-                _img_ = np.stack((_img_,) * 3, -1)  # Make the image to be 3 channel image
-            _img_data_.append(_img_)
-        except TypeError:
-            print('Type error on loading ' + _file_)
-    return_vals.append(_img_data_)
-
 
 def main():
     base = 'output/color_sepe/'

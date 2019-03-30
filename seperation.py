@@ -14,6 +14,9 @@ import time
 import random
 
 
+possible_styles = ["Baroque", "Expressionism", "Pointillism"]
+
+
 def crop_imgs(img):
     croped = []
     # Resize to 256 * 256 img
@@ -35,7 +38,7 @@ def main(argv):
         os.makedirs(output)
     styles = os.listdir(argv[1])
     for style in styles:
-        if style != ".DS_Store":
+        if style != ".DS_Store" and style in possible_styles:
             # Create the directory
             if not os.path.exists(output + "/" + style):
                 os.makedirs(output + "/" + style)
