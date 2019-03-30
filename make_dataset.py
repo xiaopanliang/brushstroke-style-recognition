@@ -1,49 +1,55 @@
 import os
 import numpy as np
+import sys
 
 
-def main():
-    base = 'output/color_sepe/'
-    folders = os.listdir(base)
-    label = 0
+label_map = {
+    "Baroque": 0,
+    "Expressionism": 1,
+    "Pointillism": 2
+}
 
+
+def main(argv):
     train_files = []
     train_labels = []
 
     eval_files = []
     eval_labels = []
 
-    vali_files = []
-    vali_labels = []
+    styles = os.listdir(argv[1])
 
-    for folder in folders:
-        if folder != 'aa':
-            files = os.listdir(base + folder + '/')
-            files = files[:1760]
-            train_set_num = int(1408-176)
-            eval_set_num = int(1408)
-            train_set = files[:train_set_num]
-            eval_set = files[train_set_num:eval_set_num]
-            vali_set = files[eval_set_num:]
-            for file in train_set:
-                train_files.append(base + folder + '/' + file)
-                train_labels.append(label)
-            for file in eval_set:
-                eval_files.append(base + folder + '/' + file)
-                eval_labels.append(label)
-            for file in vali_set:
-                vali_files.append(base + folder + '/' + file)
-                vali_labels.append(label)
-            label += 1
-    np.save('rbtrain_imgs', train_files)
-    np.save('rbtrain_lbs', train_labels)
-    np.save('rbeval_imgs', eval_files)
-    np.save('rbeval_lbs', eval_labels)
-    np.save('rbvali_imgs', vali_files)
-    np.save('rbvali_lbs', vali_labels)
+    for style in styles:
+        if style != ".DS_Store":
+            datasets = os.listdir(argv[1] + "/" + style)
+            for dataset in datasets:
+                if dataset != ".DS_Store":
+                    dataset_dir = argv[1] + "/" + style + "/" + dataset
+                    if dataset == "train_set":
+                        imgs = os.listdir(dataset_dir)
+                        for img in imgs:
+                            if img != ".DS_Store":
+                                train_files.append(dataset_dir + "/" + img)
+                                train_labels.append(label_map[style])
+                    elif dataset == "eval_set":
+                        imgs = os.listdir(dataset_dir)
+                        for img in imgs:
+                            if img != ".DS_Store":
+                                eval_files.append(dataset_dir + "/" + img)
+                                eval_labels.append(label_map[style])
+
+    np.save('train_imgs', train_files)
+    np.save('train_lbs', train_labels)
+
+    np.save('eval_imgs', eval_files)
+    np.save('eval_lbs', eval_labels)
 
 
 if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Program accepts the directory parameter!")
+        sys.exit(1)
+
     print('starting making dataset...')
-    main()
+    main(sys.argv)
     print('finished making dataset')
