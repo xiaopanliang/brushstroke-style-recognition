@@ -365,7 +365,8 @@ def main():
                         return
                     sess.run(train_op, feed_dict=train_dict)
             count += 1
-            saver.save(sess, check_pt_path_str + '/model.ckpt')
+            if count % 50:
+                saver.save(sess, check_pt_path_str + '/model.ckpt')
 
 
 if __name__ == "__main__":
