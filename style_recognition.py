@@ -351,18 +351,17 @@ def main():
             _, _, _, channel = train_data.shape
 
             if channel == 3:
-                for _ in range(100):
-                    train_dict = {net['input']:  train_data, net['labels']:  train_label}
-                    # Train the model
-                    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                    with tf.control_dependencies(update_ops):
-                         loss_val = sess.run(loss, feed_dict=train_dict)
-                         print('loss:' + str(loss_val))
-                         if loss_val < 0.005:
-                             break
-                         if math.isnan(loss_val):
-                             return
-                         sess.run(train_op, feed_dict=train_dict)
+                train_dict = {net['input']:  train_data, net['labels']:  train_label}
+                # Train the model
+                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                with tf.control_dependencies(update_ops):
+                    loss_val = sess.run(loss, feed_dict=train_dict)
+                    print('loss:' + str(loss_val))
+                    if loss_val < 0.005:
+                        break
+                    if math.isnan(loss_val):
+                        return
+                    sess.run(train_op, feed_dict=train_dict)
 
 
 if __name__ == "__main__":
