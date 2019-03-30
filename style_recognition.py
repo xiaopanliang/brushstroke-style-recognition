@@ -21,7 +21,7 @@ batch_size = 16
 img_height = 32 * 4
 img_width = 32 * 4
 epochs = 1000
-units = 2
+units = 3
 
 
 def conv_layer(name, layer_input, w):
