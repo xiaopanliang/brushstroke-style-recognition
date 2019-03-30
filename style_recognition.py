@@ -16,7 +16,7 @@ import math
 import os
 import cv2
 
-check_pt_path_str = 'checkpointbinarytest/'
+check_pt_path_str = 'checkpoints'
 batch_size = 16
 img_height = 32 * 4
 img_width = 32 * 4
@@ -334,9 +334,11 @@ def main():
     itr_eval = get_eval_iterator()
     next_eval_batch = itr_eval.get_next()
 
+    # Define the saver for storing variables
+    saver = tf.train.Saver(tf.trainable_variables())
+
     # The counter for tracking the number of batches
     count = 0
-    arr = []
     with tf.device('/gpu:0'), tf.Session() as sess:
 
         sess.run(tf.global_variables_initializer())
@@ -362,6 +364,8 @@ def main():
                     if math.isnan(loss_val):
                         return
                     sess.run(train_op, feed_dict=train_dict)
+            count += 1
+            saver.save(sess, check_pt_path_str + '/model.ckpt')
 
 
 if __name__ == "__main__":
