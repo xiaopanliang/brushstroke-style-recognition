@@ -344,6 +344,8 @@ def main():
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
 
+        saver.restore(sess, tf.train.latest_checkpoint(check_pt_path_str))
+
         while True:
             train_data, train_label = sess.run(next_train_batch)
             eval_data, eval_label = sess.run(next_eval_batch)
@@ -365,7 +367,7 @@ def main():
                         return
                     sess.run(train_op, feed_dict=train_dict)
             count += 1
-            if count % 50:
+            if (count % 50) == 0:
                 print("saving checkpoint...")
                 saver.save(sess, check_pt_path_str + '/model.ckpt')
 
