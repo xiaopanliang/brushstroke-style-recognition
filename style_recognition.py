@@ -270,7 +270,6 @@ def get_eval_iterator():
     labels = np.load('eval_lbs.npy')
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.repeat(epochs)
-    #    dataset = dataset.shuffle(12000)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
@@ -344,11 +343,12 @@ def main():
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
 
-        saver.restore(sess, tf.train.latest_checkpoint(check_pt_path_str))
+        latest_checkpoint = tf.train.latest_checkpoint(check_pt_path_str)
+        if latest_checkpoint != None:
+            saver.restore(sess, latest_checkpoint)
 
         while True:
             train_data, train_label = sess.run(next_train_batch)
-            eval_data, eval_label = sess.run(next_eval_batch)
 
             print('********************************')
             print('processing batch:' + str(count))
@@ -370,6 +370,18 @@ def main():
             if (count % 50) == 0:
                 print("saving checkpoint...")
                 saver.save(sess, check_pt_path_str + '/model.ckpt')
+            if (count % 100) == 0:
+                print("evaluating...")
+                while True:
+                    try:
+                        eval_data, eval_label = sess.run(next_eval_batch)
+                        eval_dict = {net['input']:  eval_data, net['labels']:  eval_label}
+                        sess.run(acc_op, feed_dict=eval_dict)
+                    except tf.errors.OutOfRangeError:
+                        # Determine if the end of the eval dataset is reached
+                        break
+                acc_str = str(sess.run(acc))
+                print("accuracy: " + acc_str)
 
 
 if __name__ == "__main__":
