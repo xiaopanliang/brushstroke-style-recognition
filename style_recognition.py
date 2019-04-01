@@ -9,6 +9,7 @@ import tensorflow as tf
 import numpy as np
 import scipy.io
 import matplotlib
+import sys
 
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
@@ -101,6 +102,16 @@ def calc_obj_logits(net):
     return net['o_fc3']
 
 
+def conclude_prediction(prediction):
+    style_counts = []
+    for num in range(units):
+        equal_op = tf.equal(prediction, num)
+        as_ints = tf.cast(equal_op, tf.int8)
+        counts = tf.reduce_sum(as_ints)
+        style_counts.append(counts)
+    return tf.argmax(input=style_counts)
+
+
 net = {}
 
 
@@ -111,6 +122,7 @@ def cnn_model_fn():
     vgg_raw_net = scipy.io.loadmat('imagenet-vgg-verydeep-19.mat')
     vgg_layers = vgg_raw_net['layers'][0]
     print('constructing layers...')
+
     net['input'] = tf.placeholder(tf.float32, shape=[batch_size, img_height, img_width, 3])
     net['labels'] = tf.placeholder(tf.int32, shape=[batch_size])
 
@@ -200,21 +212,39 @@ def cnn_model_fn():
     #    Denoise_logits = calc_regularization_logits(net)
     logits = (0.1*obj_logits + 0.9 * texture_logits)/(obj_logits+texture_logits)
     # sum_logits = logits
-    sum_logit1 = tf.reduce_sum(logits[0:4, :units], 0, keepdims=True)
-    sum_logit2 = tf.reduce_sum(logits[4:8, :units], 0, keepdims=True)
-    sum_logit3 = tf.reduce_sum(logits[8:12, :units], 0, keepdims=True)
-    sum_logit4 = tf.reduce_sum(logits[12:16, :units], 0, keepdims=True)
-    sum_logits = tf.concat(
-        [sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit2, sum_logit2, sum_logit2, sum_logit2, sum_logit3,
-         sum_logit3, sum_logit3, sum_logit3, sum_logit4, sum_logit4, sum_logit4, sum_logit4], 0)
+    # sum_logit1 = tf.reduce_sum(logits[0:4, :units], 0, keepdims=True)
+    # sum_logit2 = tf.reduce_sum(logits[4:8, :units], 0, keepdims=True)
+    # sum_logit3 = tf.reduce_sum(logits[8:12, :units], 0, keepdims=True)
+    # sum_logit4 = tf.reduce_sum(logits[12:16, :units], 0, keepdims=True)
+    # sum_logits = tf.concat(
+    #     [sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit2, sum_logit2, sum_logit2, sum_logit2, sum_logit3,
+    #      sum_logit3, sum_logit3, sum_logit3, sum_logit4, sum_logit4, sum_logit4, sum_logit4], 0)
 
+    # testing_prediction = tf.argmax(input=sum_logits, axis=1, name='testing_prediction')
+    # testing_acc, testing_acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=testing_prediction)
+    
     prediction = tf.argmax(input=logits, axis=1, name='prediction')
     obj_prediction = tf.argmax(input=obj_logits, axis=1, name='obj_prediction')
     tex_prediction = tf.argmax(input=texture_logits, axis=1, name='tex_prediction')
-    testing_prediction = tf.argmax(input=sum_logits, axis=1, name='testing_prediction')
+    
+    predictions1 = prediction[0:4]
+    prediction1 = conclude_prediction(predictions1)
 
-    acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=prediction)
-    testing_acc, testing_acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=testing_prediction)
+    predictions2 = prediction[4:8]
+    prediction2 = conclude_prediction(predictions2)
+    
+    predictions3 = prediction[8:12]
+    prediction3 = conclude_prediction(predictions3)
+    
+    predictions4 = prediction[12:16]
+    prediction4 = conclude_prediction(predictions4)
+
+    predictions = [prediction1, prediction2, prediction3, prediction4]
+
+    labels = [net['labels'][0], net['labels'][4], net['labels'][8], net['labels'][12]]
+
+    acc, acc_op = tf.metrics.accuracy(labels=labels, predictions=predictions)
+
     # conf, conf_op = tf.confusion_matrix(labels=net['labels'], predictions=testing_prediction)
     l2_regularizer = tf.contrib.layers.l2_regularizer(
         scale=0.00005, scope=None
@@ -226,7 +256,8 @@ def cnn_model_fn():
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) + regularization_penalty
     #    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits) + regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     #    tex_loss = regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
-    return loss, acc, acc_op, prediction, logits, texture_logits, obj_prediction, tex_prediction, testing_prediction, testing_acc, testing_acc_op
+    
+    return loss, acc, acc_op, prediction, logits, texture_logits, obj_prediction, tex_prediction
 
 
 
@@ -244,35 +275,29 @@ def load_imgs(img_path, label):
 def get_train_iterator():
     img_files = np.load('train_imgs.npy')
     labels = np.load('train_lbs.npy')
+    
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.shuffle(20000)
     dataset = dataset.repeat(epochs)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
-    return iterator
 
-
-def get_vali_iterator():
-    img_files = np.load('vali_imgs.npy')
-    labels = np.load('vali_lbs.npy')
-    dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
-    dataset = dataset.repeat(epochs)
-    #    dataset = dataset.shuffle(12000)
-    dataset = dataset.map(map_func=load_imgs)
-    dataset = dataset.batch(batch_size)
-    iterator = dataset.make_one_shot_iterator()
     return iterator
 
 
 def get_eval_iterator():
     img_files = np.load('eval_imgs.npy')
+    img_files = np.sort(img_files)
     labels = np.load('eval_lbs.npy')
+    labels = np.sort(labels)
+
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.repeat(epochs)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
+    
     return iterator
 
 
@@ -317,10 +342,10 @@ def get_layer_output(sess, net, layer, data_batch, label_batch):
             plt.savefig(directory + str(n) + '.png', bbox_inches='tight', pad_inches=0)
 
 
-def main():
+def main(argv):
     tf.logging.set_verbosity(tf.logging.INFO)
 
-    loss, acc, acc_op, prediction, logits, texture_logits, obj_prediction, tex_prediction, testing_prediction, testing_acc, testing_acc_op = cnn_model_fn()
+    loss, acc, acc_op, prediction, logits, texture_logits, obj_prediction, tex_prediction = cnn_model_fn()
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-08, use_locking=False)
 
@@ -338,7 +363,7 @@ def main():
 
     # The counter for tracking the number of batches
     count = 0
-    with tf.device('/gpu:0'), tf.Session() as sess:
+    with tf.Session() as sess:
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
@@ -347,42 +372,50 @@ def main():
         if latest_checkpoint != None:
             saver.restore(sess, latest_checkpoint)
 
-        while True:
-            train_data, train_label = sess.run(next_train_batch)
+        if argv[1] == "train":
+            print("training...")
+            while True:
+                try:
+                    train_data, train_label = sess.run(next_train_batch)
+                    print('********************************')
+                    print('processing batch:' + str(count))
+                    _, _, _, channel = train_data.shape
 
-            print('********************************')
-            print('processing batch:' + str(count))
-            _, _, _, channel = train_data.shape
-
-            if channel == 3:
-                train_dict = {net['input']:  train_data, net['labels']:  train_label}
-                # Train the model
-                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                with tf.control_dependencies(update_ops):
-                    loss_val = sess.run(loss, feed_dict=train_dict)
-                    print('loss:' + str(loss_val))
-                    if loss_val < 0.005:
-                        break
-                    if math.isnan(loss_val):
-                        return
-                    sess.run(train_op, feed_dict=train_dict)
-            count += 1
-            if (count % 50) == 0:
-                print("saving checkpoint...")
-                saver.save(sess, check_pt_path_str + '/model.ckpt')
-            if (count % 100) == 0:
-                print("evaluating...")
-                while True:
-                    try:
-                        eval_data, eval_label = sess.run(next_eval_batch)
-                        eval_dict = {net['input']:  eval_data, net['labels']:  eval_label}
-                        sess.run(acc_op, feed_dict=eval_dict)
-                    except tf.errors.OutOfRangeError:
-                        # Determine if the end of the eval dataset is reached
-                        break
-                acc_str = str(sess.run(acc))
-                print("accuracy: " + acc_str)
+                    if channel == 3:
+                        train_dict = {net['input']: train_data, net['labels']: train_label}
+                        # Train the model
+                        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                        with tf.control_dependencies(update_ops):
+                            loss_val = sess.run(loss, feed_dict=train_dict)
+                            print('loss:' + str(loss_val))
+                            if loss_val < 0.005:
+                                break
+                            if math.isnan(loss_val):
+                                return
+                            sess.run(train_op, feed_dict=train_dict)
+                    count += 1
+                    if (count % 50) == 0:
+                        print("saving checkpoint...")
+                        saver.save(sess, check_pt_path_str + '/model.ckpt')
+                except tf.errors.OutOfRangeError:
+                    # Determine if the dataset is reached
+                    break
+        elif argv[1] == "eval":
+            print("evaluating...")
+            while True:
+                try:
+                    eval_data, eval_label = sess.run(next_eval_batch)
+                    eval_dict = {net['input']: eval_data, net['labels']: eval_label}
+                    sess.run(acc_op, feed_dict=eval_dict)
+                except tf.errors.OutOfRangeError:
+                    # Determine if the end of the eval dataset is reached
+                    break
+            acc_str = str(sess.run(acc))
+            print("accuracy: " + acc_str)
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 2:
+        print("Program accepts the mode: train | eval!")
+        sys.exit(1)
+    main(sys.argv)
