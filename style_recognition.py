@@ -300,6 +300,7 @@ def get_eval_iterator():
     labels = np.sort(labels)
 
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
+    dataset = dataset.repeat(2)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
