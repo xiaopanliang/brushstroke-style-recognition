@@ -228,18 +228,27 @@ def cnn_model_fn():
     tex_prediction = tf.argmax(input=texture_logits, axis=1, name='tex_prediction')
     
     predictions1 = prediction[0:4]
-    prediction1 = conclude_prediction(predictions1)
+    print_op_1 = tf.Print(predictions1, [predictions1], "predictions1:", summarize=4)
+    prediction1 = conclude_prediction(print_op_1)
+    print_op_1 = tf.Print(prediction1, [prediction1], "final_prediction1:", summarize=4)
 
     predictions2 = prediction[4:8]
-    prediction2 = conclude_prediction(predictions2)
+    print_op_2 = tf.Print(predictions2, [predictions2], "predictions2:", summarize=4)
+    prediction2 = conclude_prediction(print_op_2)
+    print_op_2 = tf.Print(prediction2, [prediction2], "final_prediction2:", summarize=4)
     
     predictions3 = prediction[8:12]
-    prediction3 = conclude_prediction(predictions3)
+    print_op_3 = tf.Print(predictions3, [predictions3], "predictions3:", summarize=4)
+    prediction3 = conclude_prediction(print_op_3)
+    print_op_3 = tf.Print(prediction3, [prediction3], "final_prediction3:", summarize=4)
     
     predictions4 = prediction[12:16]
-    prediction4 = conclude_prediction(predictions4)
+    print_op_4 = tf.Print(predictions4, [predictions4], "predictions4:", summarize=4)
+    prediction4 = conclude_prediction(print_op_4)
+    print_op_4 = tf.Print(prediction4, [prediction4], "final_prediction4:", summarize=4)
 
-    predictions = [prediction1, prediction2, prediction3, prediction4]
+    predictions = [print_op_1, print_op_2, print_op_3, print_op_4]
+    predictions = tf.Print(predictions, [], "****************************")
 
     labels = [net['labels'][0], net['labels'][4], net['labels'][8], net['labels'][12]]
 
@@ -249,9 +258,7 @@ def cnn_model_fn():
     l2_regularizer = tf.contrib.layers.l2_regularizer(
         scale=0.00005, scope=None
     )
-
     weights = tf.trainable_variables()  # all vars of your graph
-
     regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) + regularization_penalty
     #    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits) + regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
@@ -293,7 +300,6 @@ def get_eval_iterator():
     labels = np.sort(labels)
 
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
-    dataset = dataset.repeat(epochs)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
@@ -342,6 +348,19 @@ def get_layer_output(sess, net, layer, data_batch, label_batch):
             plt.savefig(directory + str(n) + '.png', bbox_inches='tight', pad_inches=0)
 
 
+def eval(sess, next_eval_batch):
+    while True:
+        try:
+            eval_data, eval_label = sess.run(next_eval_batch)
+            eval_dict = {net['input']: eval_data, net['labels']: eval_label}
+            sess.run(acc_op, feed_dict=eval_dict)
+        except tf.errors.OutOfRangeError:
+            # Determine if the end of the eval dataset is reached
+            break
+    acc_str = str(sess.run(acc))
+    print("accuracy: " + acc_str)
+
+
 def main(argv):
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -373,7 +392,6 @@ def main(argv):
             saver.restore(sess, latest_checkpoint)
 
         if argv[1] == "train":
-            print("training...")
             while True:
                 try:
                     train_data, train_label = sess.run(next_train_batch)
@@ -397,21 +415,16 @@ def main(argv):
                     if (count % 50) == 0:
                         print("saving checkpoint...")
                         saver.save(sess, check_pt_path_str + '/model.ckpt')
+                    if (count % 1000) == 0:
+                        eval(sess, next_eval_batch)
                 except tf.errors.OutOfRangeError:
                     # Determine if the dataset is reached
                     break
         elif argv[1] == "eval":
-            print("evaluating...")
-            while True:
-                try:
-                    eval_data, eval_label = sess.run(next_eval_batch)
-                    eval_dict = {net['input']: eval_data, net['labels']: eval_label}
-                    sess.run(acc_op, feed_dict=eval_dict)
-                except tf.errors.OutOfRangeError:
-                    # Determine if the end of the eval dataset is reached
-                    break
-            acc_str = str(sess.run(acc))
-            print("accuracy: " + acc_str)
+            eval(sess, next_eval_batch)
+        else:
+            print("unrecognized mode!!!")
+        
 
 
 if __name__ == "__main__":
