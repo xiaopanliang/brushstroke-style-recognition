@@ -348,7 +348,7 @@ def get_layer_output(sess, net, layer, data_batch, label_batch):
             plt.savefig(directory + str(n) + '.png', bbox_inches='tight', pad_inches=0)
 
 
-def eval(sess, next_eval_batch):
+def eval(sess, next_eval_batch, acc_op, acc):
     while True:
         try:
             eval_data, eval_label = sess.run(next_eval_batch)
@@ -416,12 +416,12 @@ def main(argv):
                         print("saving checkpoint...")
                         saver.save(sess, check_pt_path_str + '/model.ckpt')
                     if (count % 1000) == 0:
-                        eval(sess, next_eval_batch)
+                        eval(sess, next_eval_batch, acc_op, acc)
                 except tf.errors.OutOfRangeError:
                     # Determine if the dataset is reached
                     break
         elif argv[1] == "eval":
-            eval(sess, next_eval_batch)
+            eval(sess, next_eval_batch, acc_op, acc)
         else:
             print("unrecognized mode!!!")
         
