@@ -349,15 +349,19 @@ def get_layer_output(sess, net, layer, data_batch, label_batch):
             plt.savefig(directory + str(n) + '.png', bbox_inches='tight', pad_inches=0)
 
 
-def eval(sess, next_eval_batch, acc_op, acc):
-    while True:
-        try:
-            eval_data, eval_label = sess.run(next_eval_batch)
-            eval_dict = {net['input']: eval_data, net['labels']: eval_label}
-            sess.run(acc_op, feed_dict=eval_dict)
-        except tf.errors.OutOfRangeError:
-            # Determine if the end of the eval dataset is reached
-            break
+def eval(sess, acc_op, acc):
+    with tf.device('/cpu:0'):
+        itr_eval = get_eval_iterator()
+        next_eval_batch = itr_eval.get_next()
+    with tf.device('/gpu:0'):
+        while True:
+            try:
+                eval_data, eval_label = sess.run(next_eval_batch)
+                eval_dict = {net['input']: eval_data, net['labels']: eval_label}
+                sess.run(acc_op, feed_dict=eval_dict)
+            except tf.errors.OutOfRangeError:
+                # Determine if the end of the eval dataset is reached
+                break
     acc_str = str(sess.run(acc))
     print("accuracy: " + acc_str)
 
@@ -374,9 +378,6 @@ def main(argv):
     # Get the iterator for the data set
     itr_train = get_train_iterator()
     next_train_batch = itr_train.get_next()
-
-    itr_eval = get_eval_iterator()
-    next_eval_batch = itr_eval.get_next()
 
     # Define the saver for storing variables
     saver = tf.train.Saver(tf.trainable_variables())
@@ -417,12 +418,12 @@ def main(argv):
                         print("saving checkpoint...")
                         saver.save(sess, check_pt_path_str + '/model.ckpt')
                     if (count % 1000) == 0:
-                        eval(sess, next_eval_batch, acc_op, acc)
+                        eval(sess, acc_op, acc)
                 except tf.errors.OutOfRangeError:
                     # Determine if the dataset is reached
                     break
         elif argv[1] == "eval":
-            eval(sess, next_eval_batch, acc_op, acc)
+            eval(sess, acc_op, acc)
         else:
             print("unrecognized mode!!!")
         
