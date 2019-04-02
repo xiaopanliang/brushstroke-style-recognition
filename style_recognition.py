@@ -407,6 +407,8 @@ def main(argv):
                         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                         with tf.control_dependencies(update_ops):
                             loss_val = sess.run(loss, feed_dict=train_dict)
+                            print("labels:" + str(sess.run(net['labels'], feed_dict=train_dict)))
+                            print("prediction:" + str(sess.run(prediction, feed_dict=train_dict)))
                             print('loss:' + str(loss_val))
                             if loss_val < 0.005:
                                 break
