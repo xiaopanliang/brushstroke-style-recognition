@@ -382,7 +382,7 @@ def main(argv):
 
     # The counter for tracking the number of batches
     count = 0
-    with tf.Session() as sess:
+    with tf.device('/gpu:0'), tf.Session() as sess:
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
