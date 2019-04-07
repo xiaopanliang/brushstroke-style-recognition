@@ -210,7 +210,7 @@ def cnn_model_fn():
     texture_logits = calc_texture_logits(net)
 
     #    Denoise_logits = calc_regularization_logits(net)
-    logits = (0.1*obj_logits + 0.9 * texture_logits)/(obj_logits+texture_logits)
+    logits = (0.1*obj_logits + 0.9 * texture_logits)
     # sum_logits = logits
     # sum_logit1 = tf.reduce_sum(logits[0:4, :units], 0, keepdims=True)
     # sum_logit2 = tf.reduce_sum(logits[4:8, :units], 0, keepdims=True)
@@ -259,8 +259,8 @@ def cnn_model_fn():
         scale=0.00005, scope=None
     )
     weights = tf.trainable_variables()  # all vars of your graph
-    regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) + regularization_penalty
+    # regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)
     #    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits) + regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     #    tex_loss = regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     
@@ -402,19 +402,20 @@ def main(argv):
                     _, _, _, channel = train_data.shape
 
                     if channel == 3:
-                        train_dict = {net['input']: train_data, net['labels']: train_label}
-                        # Train the model
-                        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                        with tf.control_dependencies(update_ops):
-                            loss_val = sess.run(loss, feed_dict=train_dict)
-                            print("labels:" + str(sess.run(net['labels'], feed_dict=train_dict)))
-                            print("prediction:" + str(sess.run(prediction, feed_dict=train_dict)))
-                            print('loss:' + str(loss_val))
-                            if loss_val < 0.005:
-                                break
-                            if math.isnan(loss_val):
-                                return
-                            sess.run(train_op, feed_dict=train_dict)
+                        for _ in range(100):
+                            train_dict = {net['input']: train_data, net['labels']: train_label}
+                            # Train the model
+                            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                            with tf.control_dependencies(update_ops):
+                                loss_val = sess.run(loss, feed_dict=train_dict)
+                                print('loss:' + str(loss_val))
+                                if loss_val < 0.005:
+                                    print("labels:" + str(sess.run(net['labels'], feed_dict=train_dict)))
+                                    print("prediction:" + str(sess.run(prediction, feed_dict=train_dict)))
+                                    break
+                                if math.isnan(loss_val):
+                                    return
+                                sess.run(train_op, feed_dict=train_dict)
                     count += 1
                     if (count % 50) == 0:
                         print("saving checkpoint...")
@@ -428,7 +429,6 @@ def main(argv):
             eval(sess, acc_op, acc)
         else:
             print("unrecognized mode!!!")
-        
 
 
 if __name__ == "__main__":
