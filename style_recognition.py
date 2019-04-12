@@ -228,27 +228,18 @@ def cnn_model_fn():
     tex_prediction = tf.argmax(input=texture_logits, axis=1, name='tex_prediction')
     
     predictions1 = prediction[0:4]
-    print_op_1 = tf.Print(predictions1, [predictions1], "predictions1:", summarize=4)
-    prediction1 = conclude_prediction(print_op_1)
-    print_op_1 = tf.Print(prediction1, [prediction1], "final_prediction1:", summarize=4)
+    prediction1 = conclude_prediction(predictions1)
 
     predictions2 = prediction[4:8]
-    print_op_2 = tf.Print(predictions2, [predictions2], "predictions2:", summarize=4)
-    prediction2 = conclude_prediction(print_op_2)
-    print_op_2 = tf.Print(prediction2, [prediction2], "final_prediction2:", summarize=4)
-    
-    predictions3 = prediction[8:12]
-    print_op_3 = tf.Print(predictions3, [predictions3], "predictions3:", summarize=4)
-    prediction3 = conclude_prediction(print_op_3)
-    print_op_3 = tf.Print(prediction3, [prediction3], "final_prediction3:", summarize=4)
-    
-    predictions4 = prediction[12:16]
-    print_op_4 = tf.Print(predictions4, [predictions4], "predictions4:", summarize=4)
-    prediction4 = conclude_prediction(print_op_4)
-    print_op_4 = tf.Print(prediction4, [prediction4], "final_prediction4:", summarize=4)
+    prediction2 = conclude_prediction(predictions2)
 
-    predictions = [print_op_1, print_op_2, print_op_3, print_op_4]
-    predictions = tf.Print(predictions, [], "****************************")
+    predictions3 = prediction[8:12]
+    prediction3 = conclude_prediction(predictions3)
+
+    predictions4 = prediction[12:16]
+    prediction4 = conclude_prediction(predictions4)
+
+    predictions = [prediction1, prediction2, prediction3, prediction4]
 
     labels = [net['labels'][0], net['labels'][4], net['labels'][8], net['labels'][12]]
 
@@ -390,7 +381,7 @@ def main(argv):
         sess.run(tf.local_variables_initializer())
 
         latest_checkpoint = tf.train.latest_checkpoint(check_pt_path_str)
-        if latest_checkpoint != None:
+        if latest_checkpoint is not None:
             saver.restore(sess, latest_checkpoint)
 
         if argv[1] == "train":
@@ -426,6 +417,7 @@ def main(argv):
                     # Determine if the dataset is reached
                     break
         elif argv[1] == "eval":
+            print("evaluating...")
             eval(sess, acc_op, acc)
         else:
             print("unrecognized mode!!!")
