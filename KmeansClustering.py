@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
 from sklearn.cluster import KMeans
-import matplotlib
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 
@@ -33,16 +31,18 @@ class DominantColors:
 
         # using k-means to cluster pixels
         kmeans = KMeans(n_clusters=self.CLUSTERS)
-        kmeans.fit(img)
+        Result = kmeans.fit(img)
+
+        Result = cv2.cvtColor(Result, cv2.COLOR_RGB2BGR)
 
         # the cluster centers are our dominant colors.
-        self.COLORS = kmeans.cluster_centers_
+        #self.COLORS = kmeans.cluster_centers_
 
         # save labels
-        self.LABELS = kmeans.labels_
+        #self.LABELS = kmeans.labels_
 
         # returning after converting to integer from float
-        return self.COLORS.astype(int)
+        return Result #self.COLORS.astype(int), Result
 
     def rgb_to_hex(self, rgb):
         return '#%02x%02x%02x' % (int(rgb[0]), int(rgb[1]), int(rgb[2]))
@@ -99,7 +99,7 @@ class DominantColors:
 
 
 img = 'ori_img.png'
-clusters = 5
+clusters = 3
 dc = DominantColors(img, clusters)
-colors = dc.dominantColors()
+result = dc.dominantColors()
 dc.plotHistogram()

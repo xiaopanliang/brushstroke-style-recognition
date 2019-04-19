@@ -19,8 +19,8 @@ import cv2
 
 check_pt_path_str = 'checkpoints'
 batch_size = 16
-img_height = 32 * 4
-img_width = 32 * 4
+img_height = 32 * 8
+img_width = 32 * 8
 epochs = 1000
 units = 3
 
@@ -250,8 +250,8 @@ def cnn_model_fn():
         scale=0.00005, scope=None
     )
     weights = tf.trainable_variables()  # all vars of your graph
-    # regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)
+    #regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) #+ regularization_penalty
     #    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits) + regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     #    tex_loss = regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     # Prediction is the prediction for each piece. Predictions are prediction for each image when eval, it is not
@@ -424,7 +424,7 @@ def main(argv):
                         print("saving checkpoint...")
                         saver.save(sess, check_pt_path_str + '/model.ckpt')
                     if (count % 1000) == 0:
-                        eval(sess, acc_op, acc)
+                        eval(sess, acc_op, acc, predictions, labels)
                 except tf.errors.OutOfRangeError:
                     # Determine if the dataset is reached
                     break
