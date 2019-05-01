@@ -200,64 +200,43 @@ def cnn_model_fn():
     net['pool5'] = pool_layer('pool5', net['relu5_4'])
 
     # Fully connected to get logits
-    obj_logits = calc_obj_logits(net)
+    # obj_logits = calc_obj_logits(net)
     texture_logits = calc_texture_logits(net)
-
-    concat_logits = tf.concat([obj_logits, texture_logits], axis=1)
-    net['fc1'] = fc_layer('fc1', concat_logits, 512, tf.nn.relu)
-    net['fc2'] = fc_layer('fc2', concat_logits, 512, tf.nn.relu)
-    net['fc3'] = fc_layer('fc3', concat_logits, units, None)
+    # obj_logits = tf.multiply(obj_logits,tf.reduce_mean(texture_logits)/tf.reduce_mean(obj_logits))
+    # concat_logits = tf.concat([obj_logits, texture_logits], axis=1)
+    # concat_logits = texture_logits
+    net['fc1'] = fc_layer('fc1', texture_logits, 512, tf.nn.relu)
+    net['fc2'] = fc_layer('fc2', net['fc1'], 512, tf.nn.relu)
+    net['fc3'] = fc_layer('fc3', net['fc2'], units, None)
 
     #    Denoise_logits = calc_regularization_logits(net)
     # logits = (0.1*obj_logits + 0.9 * texture_logits)
     logits = net['fc3']
-    # sum_logits = logits
-    # sum_logit1 = tf.reduce_sum(logits[0:4, :units], 0, keepdims=True)
-    # sum_logit2 = tf.reduce_sum(logits[4:8, :units], 0, keepdims=True)
-    # sum_logit3 = tf.reduce_sum(logits[8:12, :units], 0, keepdims=True)
-    # sum_logit4 = tf.reduce_sum(logits[12:16, :units], 0, keepdims=True)
-    # sum_logits = tf.concat(
-    #     [sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit2, sum_logit2, sum_logit2, sum_logit2, sum_logit3,
-    #      sum_logit3, sum_logit3, sum_logit3, sum_logit4, sum_logit4, sum_logit4, sum_logit4], 0)
 
-    # testing_prediction = tf.argmax(input=sum_logits, axis=1, name='testing_prediction')
-    # testing_acc, testing_acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=testing_prediction)
-    
-    prediction = tf.argmax(input=logits, axis=1, name='prediction')
-    obj_prediction = tf.argmax(input=obj_logits, axis=1, name='obj_prediction')
-    tex_prediction = tf.argmax(input=texture_logits, axis=1, name='tex_prediction')
-    
-    predictions1 = prediction[0:4]
-    prediction1 = conclude_prediction(predictions1)
+    sum_logit1 = tf.reduce_mean(logits[0:16, :units], 0, keepdims=True)
+    sum_logits = tf.concat(
+        [sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1,
+         sum_logit1, sum_logit1, sum_logit1, sum_logit1,sum_logit1, sum_logit1, sum_logit1, sum_logit1], 0)
 
-    predictions2 = prediction[4:8]
-    prediction2 = conclude_prediction(predictions2)
+    eval_prediction = tf.argmax(input=sum_logits, axis=1, name='eval_prediction')
+    acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=eval_prediction)
 
-    predictions3 = prediction[8:12]
-    prediction3 = conclude_prediction(predictions3)
-
-    predictions4 = prediction[12:16]
-    prediction4 = conclude_prediction(predictions4)
-
-    predictions = [prediction1, prediction2, prediction3, prediction4]
-
-    labels = [net['labels'][0], net['labels'][4], net['labels'][8], net['labels'][12]]
-
-    acc, acc_op = tf.metrics.accuracy(labels=labels, predictions=predictions)
+    train_prediction = tf.argmax(input=logits, axis=1, name="train_prediction")
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)  # + regularization_penalty
 
     # conf, conf_op = tf.confusion_matrix(labels=net['labels'], predictions=testing_prediction)
-    l2_regularizer = tf.contrib.layers.l2_regularizer(
-        scale=0.00005, scope=None
-    )
-    weights = tf.trainable_variables()  # all vars of your graph
-    #regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits) #+ regularization_penalty
-    #    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits) + regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
-    #    tex_loss = regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
+    # l2_regularizer = tf.contrib.layers.l2_regularizer(
+    #     scale=0.00005, scope=None
+    # )
+
+    # weights = tf.trainable_variables()  # all vars of your graph
+    # regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
+    # loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=obj_logits) + regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
+    # tex_loss = regularization_penalty + tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=texture_logits)
     # Prediction is the prediction for each piece. Predictions are prediction for each image when eval, it is not
     # important under train mode
     # Labels are for the whole image instead of each piece
-    return loss, acc, acc_op, prediction, predictions, labels, logits, texture_logits, obj_prediction, tex_prediction
+    return loss, acc, acc_op, net['labels'], train_prediction, eval_prediction, logits
 
 
 def load_imgs(img_path, label):
@@ -292,7 +271,7 @@ def get_eval_iterator():
     labels = np.sort(labels)
 
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
-    dataset = dataset.repeat(2)
+    dataset = dataset.repeat(1)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
@@ -372,7 +351,7 @@ def eval(sess, acc_op, acc, predictions, labels):
 def main(argv):
     tf.logging.set_verbosity(tf.logging.INFO)
 
-    loss, acc, acc_op, prediction, predictions, labels, logits, texture_logits, obj_prediction, tex_prediction = cnn_model_fn()
+    loss, acc, acc_op, labels, train_prediction, eval_prediction, logits = cnn_model_fn()
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-08, use_locking=False)
 
@@ -412,9 +391,9 @@ def main(argv):
                             with tf.control_dependencies(update_ops):
                                 loss_val = sess.run(loss, feed_dict=train_dict)
                                 print('loss:' + str(loss_val))
-                                if loss_val < 0.005:
+                                if loss_val < 0.01:
                                     print("labels:" + str(sess.run(net['labels'], feed_dict=train_dict)))
-                                    print("prediction:" + str(sess.run(prediction, feed_dict=train_dict)))
+                                    print("prediction:" + str(sess.run(train_prediction, feed_dict=train_dict)))
                                     break
                                 if math.isnan(loss_val):
                                     return
@@ -424,13 +403,13 @@ def main(argv):
                         print("saving checkpoint...")
                         saver.save(sess, check_pt_path_str + '/model.ckpt')
                     if (count % 1000) == 0:
-                        eval(sess, acc_op, acc, predictions, labels)
+                        eval(sess, acc_op, acc, eval_prediction, labels)
                 except tf.errors.OutOfRangeError:
                     # Determine if the dataset is reached
                     break
         elif argv[1] == "eval":
             print("evaluating...")
-            eval(sess, acc_op, acc, predictions, labels)
+            eval(sess, acc_op, acc, eval_prediction, labels)
         else:
             print("unrecognized mode!!!")
 

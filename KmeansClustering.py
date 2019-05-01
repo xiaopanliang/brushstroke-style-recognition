@@ -33,7 +33,7 @@ class DominantColors:
         kmeans = KMeans(n_clusters=self.CLUSTERS)
         Result = kmeans.fit(img)
 
-        Result = cv2.cvtColor(Result, cv2.COLOR_RGB2BGR)
+        # Result = cv2.cvtColor(Result, cv2.COLOR_RGB2BGR)
 
         # the cluster centers are our dominant colors.
         #self.COLORS = kmeans.cluster_centers_
@@ -98,8 +98,10 @@ class DominantColors:
         plt.show()
 
 
-img = 'ori_img.png'
+img = 'test.png'
 clusters = 3
 dc = DominantColors(img, clusters)
 result = dc.dominantColors()
-dc.plotHistogram()
+# plt.figure()
+# plt.imshow(result)
+#dc.plotHistogram()/home/harryliang52/Documents/brushstrok_research/brushstroke-style-recognition/cropedImages/Baroque/train_set/adriaen-brouwer_jan-davidszoon-de-heem_0.png

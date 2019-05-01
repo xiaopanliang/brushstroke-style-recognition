@@ -22,7 +22,7 @@ def crop_imgs(img):
     # Resize to 256 * 256 img
     resized_img = cv2.resize(img, (256, 256))
     # Crop 224 * 224 pieces
-    crop_num = 4
+    crop_num = 16
     for _ in range(crop_num):
         start_point_y = random.randint(0, 32)
         start_point_x = random.randint(0, 32)
