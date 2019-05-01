@@ -1,107 +1,49 @@
-import cv2
 import numpy as np
-from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
+import cv2
 
+img = cv2.imread('test.jpg')
+Z = img.reshape((-1, 3))
 
-class DominantColors:
+# convert to np.float32
+Z = np.float32(Z)
 
-    CLUSTERS = None
-    IMAGE = None
-    COLORS = None
-    LABELS = None
+# define criteria, number of clusters(K) and apply kmeans()
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+K = 30
+ret, label, center = cv2.kmeans(
+    Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
 
-    def __init__(self, image, clusters=3):
-        self.CLUSTERS = clusters
-        self.IMAGE = image
+# Now convert back into uint8, and make original image
+center = np.uint8(center)
 
-    def dominantColors(self):
+height, width, channel = img.shape
 
-        # read image
-        img = cv2.imread(self.IMAGE)
+label = label.flatten()
 
-        # convert to rgb from bgr
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+counts = [0] * K
 
-        # reshaping to a list of pixels
-        img = img.reshape((img.shape[0] * img.shape[1], 3))
+for i in range(len(label)):
+  counts[label[i]] += 1
 
-        # save image after operations
-        self.IMAGE = img
+start_position = []
+result = np.zeros((Z.shape))
 
-        # using k-means to cluster pixels
-        kmeans = KMeans(n_clusters=self.CLUSTERS)
-        Result = kmeans.fit(img)
+for i in range(len(counts)):
+  if i == 0:
+    start_position.append(0)
+  else:
+    start_position.append(start_position[i - 1] + counts[i - 1])
 
-        # Result = cv2.cvtColor(Result, cv2.COLOR_RGB2BGR)
+position_tracker = start_position.copy()
+for i in range(len(result)):
+  index = position_tracker[label[i]]
+  result[index][0] = Z[i][0]
+  result[index][1] = Z[i][1]
+  result[index][2] = Z[i][2]
+  position_tracker[label[i]] = index + 1
 
-        # the cluster centers are our dominant colors.
-        #self.COLORS = kmeans.cluster_centers_
+result = np.uint8(result.reshape(img.shape))
 
-        # save labels
-        #self.LABELS = kmeans.labels_
-
-        # returning after converting to integer from float
-        return Result #self.COLORS.astype(int), Result
-
-    def rgb_to_hex(self, rgb):
-        return '#%02x%02x%02x' % (int(rgb[0]), int(rgb[1]), int(rgb[2]))
-
-    def plotClusters(self):
-        # plotting
-        fig = plt.figure()
-        ax = Axes3D(fig)
-        for label, pix in zip(self.LABELS, self.IMAGE):
-            ax.scatter(pix[0], pix[1], pix[2],
-                       color=self.rgb_to_hex(self.COLORS[label]))
-        plt.show()
-
-    def plotHistogram(self):
-
-        # labels form 0 to no. of clusters
-        numLabels = np.arange(0, self.CLUSTERS+1)
-
-        # create frequency count tables
-        (hist, _) = np.histogram(self.LABELS, bins=numLabels)
-        hist = hist.astype("float")
-        hist /= hist.sum()
-
-        # appending frequencies to cluster centers
-        colors = self.COLORS
-
-        # descending order sorting as per frequency count
-        colors = colors[(-hist).argsort()]
-        hist = hist[(-hist).argsort()]
-
-        # creating empty chart
-        chart = np.zeros((50, 500, 3), np.uint8)
-        start = 0
-
-        # creating color rectangles
-        for i in range(self.CLUSTERS):
-            end = start + hist[i] * 500
-
-            # getting rgb values
-            r = colors[i][0]
-            g = colors[i][1]
-            b = colors[i][2]
-
-            # using cv2.rectangle to plot colors
-            cv2.rectangle(chart, (int(start), 0),
-                          (int(end), 50), (r, g, b), -1)
-            start = end
-
-        # display chart
-        plt.figure()
-        plt.axis("off")
-        plt.imshow(chart)
-        plt.show()
-
-
-img = 'test.png'
-clusters = 3
-dc = DominantColors(img, clusters)
-result = dc.dominantColors()
-# plt.figure()
-# plt.imshow(result)
-#dc.plotHistogram()/home/harryliang52/Documents/brushstrok_research/brushstroke-style-recognition/cropedImages/Baroque/train_set/adriaen-brouwer_jan-davidszoon-de-heem_0.png
+cv2.imshow('result', result)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
