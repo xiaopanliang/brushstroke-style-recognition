@@ -35,9 +35,9 @@ def main(argv):
                     for img_name in img_names:
                         if img_name != ".DS_Store":
                             div_index = img_name.rfind("_")
-                            img_name = img_name[:div_index] + ".png"
-                            copyfile(input_path + "/"  + style + "/" + data_set + "/" + img_name, 
-                                     output_path + "/"  + style + "/" + img_name)
+                            img_name = img_name[:div_index] + ".jpg"
+                            copyfile(input_path + "/"  + style + "/" +  img_name, 
+                                     output_path + "/"  + style + "/" + data_set + "/" + img_name)
 
 
 if __name__ == '__main__':

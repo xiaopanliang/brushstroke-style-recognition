@@ -242,8 +242,7 @@ def cnn_model_fn():
 def load_imgs(img_path, label):
     img_string = tf.read_file(img_path)
     img_decoded = tf.image.decode_jpeg(img_string, 0)
-    img = tf.image.resize_image_with_pad(img_decoded, img_height, img_width,
-                                         method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    img = tf.image.resize_image_with_pad(img_decoded, img_height, img_width)
     # img = tf.image.grayscale_to_rgb(img)
     # img = tf.image.adjust_contrast(img,10)
     img = tf.image.per_image_standardization(img)
@@ -255,8 +254,8 @@ def get_train_iterator():
     labels = np.load('train_lbs.npy')
     
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
-    dataset = dataset.shuffle(20000)
     dataset = dataset.repeat(epochs)
+    dataset = dataset.shuffle(30000)
     dataset = dataset.map(map_func=load_imgs)
     dataset = dataset.batch(batch_size)
     iterator = dataset.make_one_shot_iterator()
@@ -353,7 +352,7 @@ def main(argv):
 
     loss, acc, acc_op, labels, train_prediction, eval_prediction, logits = cnn_model_fn()
 
-    optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-08, use_locking=False)
+    optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-7, use_locking=False)
 
     train_op = optimizer.minimize(loss)
 
@@ -391,7 +390,7 @@ def main(argv):
                             with tf.control_dependencies(update_ops):
                                 loss_val = sess.run(loss, feed_dict=train_dict)
                                 print('loss:' + str(loss_val))
-                                if loss_val < 0.01:
+                                if loss_val < 0.1:
                                     print("labels:" + str(sess.run(net['labels'], feed_dict=train_dict)))
                                     print("prediction:" + str(sess.run(train_prediction, feed_dict=train_dict)))
                                     break
