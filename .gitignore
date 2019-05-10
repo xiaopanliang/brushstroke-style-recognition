@@ -25,3 +25,5 @@ cropedImages/
 *.m~
 binaryImages/
 randomImages/
+oriimages/
+oriimagesparts/

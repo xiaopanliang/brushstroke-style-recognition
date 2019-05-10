@@ -23,26 +23,32 @@ def main(argv):
         os.mkdir(output_path)
     styles = os.listdir(brushstroke_path)
     for style in styles:
-        if style != ".DS_Store":
-            data_sets = os.listdir(brushstroke_path + "/" + style)
-            if not os.path.exists(output_path + "/"  + style):
-                os.mkdir(output_path + "/"  + style)
-            for data_set in data_sets:
-                if data_set != ".DS_Store":
-                    if not os.path.exists(output_path + "/"  + style + "/" + data_set):
-                        os.mkdir(output_path + "/"  + style + "/" + data_set)
-                    img_names = os.listdir(brushstroke_path + "/"  + style + "/" + data_set)
-                    for img_name in img_names:
-                        if img_name != ".DS_Store":
-                            div_index = img_name.rfind("_")
-                            img_name = img_name[:div_index] + ".png"
-                            copyfile(input_path + "/"  + style + "/" + data_set + "/" + img_name, 
-                                     output_path + "/"  + style + "/" + img_name)
+        if not os.path.exists(output_path + "/" + style):
+            if style != ".DS_Store":
+                print("Processing style:" + style)
+                data_sets = os.listdir(brushstroke_path + "/" + style)
+                if not os.path.exists(output_path + "/"  + style):
+                    os.mkdir(output_path + "/"  + style)
+                for data_set in data_sets:
+                    if data_set != ".DS_Store":
+                        if not os.path.exists(output_path + "/"  + style + "/" + data_set):
+                            os.mkdir(output_path + "/"  + style + "/" + data_set)
+                        img_names = os.listdir(brushstroke_path + "/"  + style + "/" + data_set)
+                        for img_name in img_names:
+                            try:
+                                if img_name != ".DS_Store":
+                                    div_index = img_name.rfind("_")
+                                    img_name = img_name[:div_index] + ".jpg"
+                                    copyfile(input_path + "/"  + style + "/" +  img_name, 
+                                             output_path + "/"  + style + "/" + data_set + "/" + img_name)
+                            except:
+                                print("skip:" + input_path + "/"  + style + "/" +  img_name)
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         print("Program accepts the input path, output path, and brushstrok path!")
         sys.exit(1)
-    main(sys.argv)
     print('Executing...')
+    main(sys.argv)
+    print("Finished.")
