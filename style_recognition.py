@@ -22,7 +22,7 @@ batch_size = 16
 img_height = 32 * 8
 img_width = 32 * 8
 epochs = 1000
-units = 3
+units = np.amax(np.load("train_lbs.npy")) + 1
 
 
 def conv_layer(name, layer_input, w):

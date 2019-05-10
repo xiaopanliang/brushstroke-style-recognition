@@ -35,7 +35,7 @@ def main(argv):
         os.mkdir(output_path)
     styles = os.listdir(input_path)
     for style in styles:
-        if style != ".DS_Store":
+        if not os.path.exists(output_path + "/"  + style) and style != ".DS_Store":
             data_sets = os.listdir(input_path + "/" + style)
             if not os.path.exists(output_path + "/"  + style):
                 os.mkdir(output_path + "/"  + style)

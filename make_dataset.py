@@ -3,11 +3,7 @@ import numpy as np
 import sys
 
 
-label_map = {
-    "Baroque": 0,
-    "Expressionism": 1,
-    "Pointillism": 2
-}
+possible_styles = ["Baroque", "Expressionism", "Pointillism", "Romanticism", "Ukiyo_e"]
 
 
 def main(argv):
@@ -18,9 +14,10 @@ def main(argv):
     eval_labels = []
 
     styles = os.listdir(argv[1])
+    styles.sort()
 
-    for style in styles:
-        if style != ".DS_Store":
+    for label, style in enumerate(possible_styles):
+        if style != ".DS_Store" and style in possible_styles:
             datasets = os.listdir(argv[1] + "/" + style)
             for dataset in datasets:
                 if dataset != ".DS_Store":
@@ -30,13 +27,13 @@ def main(argv):
                         for img in imgs:
                             if img != ".DS_Store":
                                 train_files.append(dataset_dir + "/" + img)
-                                train_labels.append(label_map[style])
+                                train_labels.append(label)
                     elif dataset == "eval_set":
                         imgs = os.listdir(dataset_dir)
                         for img in imgs:
                             if img != ".DS_Store":
                                 eval_files.append(dataset_dir + "/" + img)
-                                eval_labels.append(label_map[style])
+                                eval_labels.append(label)
 
     np.save('train_imgs', train_files)
     np.save('train_lbs', train_labels)
