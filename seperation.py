@@ -14,15 +14,16 @@ import time
 import random
 
 
-possible_styles = ["Baroque", "Expressionism", "Impressionism", "Pointillism", "Romanticism", "Ukiyo_e"]
-
-
-def crop_imgs(img):
+def crop_imgs(img, style):
     croped = []
     # Resize to 256 * 256 img
     resized_img = cv2.resize(img, (256, 256))
     # Crop 224 * 224 pieces
     crop_num = 16
+    if style == "Ink and wash painting":
+        crop_num = 22
+    elif style == "Photorealism":
+        crop_num = 71
     for _ in range(crop_num):
         start_point_y = random.randint(0, 32)
         start_point_x = random.randint(0, 32)
@@ -32,11 +33,11 @@ def crop_imgs(img):
     return croped
 
 
-def start_croping(imgs, input_dir, output_dir):
+def start_croping(imgs, input_dir, output_dir, style):
     for img in imgs:
         if img != ".DS_Store":
             img_data = cv2.imread(input_dir + "/" + img)
-            croped_imgs = crop_imgs(img_data)
+            croped_imgs = crop_imgs(img_data, style)
             for n, croped_img in enumerate(croped_imgs):
                 file_name = output_dir + "/" + \
                     img[:-4] + "_" + str(n) + ".png"
@@ -50,7 +51,7 @@ def main(argv):
     styles = os.listdir(argv[1])
     for style in styles:
         if not os.path.exists(output + "/" + style):
-            if style != ".DS_Store" and style in possible_styles:
+            if style != ".DS_Store":
                 print("processing style:" + style)
                 # Create the directory
                 if not os.path.exists(output + "/" + style):
@@ -59,8 +60,9 @@ def main(argv):
                 imgs = os.listdir(argv[1] + "/" + style)
                 # Shuffle imgs
                 random.shuffle(imgs)
-                train_imgs = imgs[:450]
-                eval_imgs = imgs[450:500]
+                split_index = int(len(imgs) * 0.9)
+                train_imgs = imgs[:split_index]
+                eval_imgs = imgs[split_index:]
                 train_set_output_dir = output + "/" + style + "/train_set"
                 eval_set_output_dir = output + "/" + style + "/eval_set"
                 # Create test set folder and folder for storing imgs
@@ -69,8 +71,8 @@ def main(argv):
                 if not os.path.exists(eval_set_output_dir):
                     os.makedirs(eval_set_output_dir)
                 input_dir = argv[1] + "/" + style
-                start_croping(train_imgs, input_dir, train_set_output_dir)
-                start_croping(eval_imgs, input_dir, eval_set_output_dir)
+                start_croping(train_imgs, input_dir, train_set_output_dir, style)
+                start_croping(eval_imgs, input_dir, eval_set_output_dir, style)
 
 
 if __name__ == '__main__':

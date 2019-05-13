@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from random import randint
 
 
-def crop_imgs(input_dir, output_dir):
+def crop_imgs(input_dir, output_dir, style):
     img_name_i = input_dir.rfind("/")
     img_name = input_dir[img_name_i + 1:]
     img = cv2.imread(input_dir)
@@ -16,6 +16,10 @@ def crop_imgs(input_dir, output_dir):
     resized_img = cv2.resize(img, (256, 256))
     # Crop 224 * 224 pieces
     crop_num = 16
+    if style == "Ink and wash painting":
+        crop_num = 22 
+    elif style == "Photorealism":
+        crop_num = 71
     for n in range(crop_num):
         start_point_y = randint(0, 32)
         start_point_x = randint(0, 32)
@@ -47,7 +51,7 @@ def main(argv):
                     for img_name in img_names:
                         if img_name != ".DS_Store":
                             crop_imgs(input_path + "/"  + style + "/" + data_set + "/" + img_name, 
-                                      output_path + "/"  + style + "/" + data_set)
+                                      output_path + "/"  + style + "/" + data_set, style)
 
 
 if __name__ == '__main__':

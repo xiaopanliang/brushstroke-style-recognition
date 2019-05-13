@@ -3,9 +3,6 @@ import numpy as np
 import sys
 
 
-possible_styles = ["Baroque", "Expressionism", "Pointillism", "Romanticism", "Ukiyo_e"]
-
-
 def main(argv):
     train_files = []
     train_labels = []
@@ -16,8 +13,8 @@ def main(argv):
     styles = os.listdir(argv[1])
     styles.sort()
 
-    for label, style in enumerate(possible_styles):
-        if style != ".DS_Store" and style in possible_styles:
+    for label, style in enumerate(styles):
+        if style != ".DS_Store":
             datasets = os.listdir(argv[1] + "/" + style)
             for dataset in datasets:
                 if dataset != ".DS_Store":

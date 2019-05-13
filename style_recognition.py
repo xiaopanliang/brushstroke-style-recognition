@@ -398,11 +398,11 @@ def main(argv):
                                     return
                                 sess.run(train_op, feed_dict=train_dict)
                     count += 1
-                    if (count % 50) == 0:
+                    if (count % 150) == 0:
                         print("saving checkpoint...")
                         saver.save(sess, check_pt_path_str + '/model.ckpt')
-                    if (count % 1000) == 0:
-                        eval(sess, acc_op, acc, eval_prediction, labels)
+                    # if (count % 1000) == 0:
+                        # eval(sess, acc_op, acc, eval_prediction, labels)
                 except tf.errors.OutOfRangeError:
                     # Determine if the dataset is reached
                     break
