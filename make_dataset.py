@@ -3,6 +3,9 @@ import numpy as np
 import sys
 
 
+special_styles = ['Photorealism', 'Ink and wash painting']
+
+
 def main(argv):
     train_files = []
     train_labels = []
@@ -14,7 +17,7 @@ def main(argv):
     styles.sort()
 
     for label, style in enumerate(styles):
-        if style != ".DS_Store":
+        if style != ".DS_Store" and style not in special_styles:
             datasets = os.listdir(argv[1] + "/" + style)
             for dataset in datasets:
                 if dataset != ".DS_Store":

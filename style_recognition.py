@@ -213,15 +213,14 @@ def cnn_model_fn():
     # logits = (0.1*obj_logits + 0.9 * texture_logits)
     logits = net['fc3']
 
-    sum_logit1 = tf.reduce_mean(logits[0:16, :units], 0, keepdims=True)
-    sum_logits = tf.concat(
-        [sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1, sum_logit1,
-         sum_logit1, sum_logit1, sum_logit1, sum_logit1,sum_logit1, sum_logit1, sum_logit1, sum_logit1], 0)
-
-    eval_prediction = tf.argmax(input=sum_logits, axis=1, name='eval_prediction')
-    acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=eval_prediction)
+    sum_logits = tf.reduce_mean(logits, 0, keepdims=True)
+    sum_logits = tf.concat([sum_logits] * batch_size, 0)
 
     train_prediction = tf.argmax(input=logits, axis=1, name="train_prediction")
+    eval_prediction = tf.argmax(input=sum_logits, axis=1, name='eval_prediction')
+    
+    acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=eval_prediction)
+
     loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)  # + regularization_penalty
 
     # conf, conf_op = tf.confusion_matrix(labels=net['labels'], predictions=testing_prediction)
@@ -236,7 +235,12 @@ def cnn_model_fn():
     # Prediction is the prediction for each piece. Predictions are prediction for each image when eval, it is not
     # important under train mode
     # Labels are for the whole image instead of each piece
-    return loss, acc, acc_op, net['labels'], train_prediction, eval_prediction, logits
+    return loss, \
+           acc, acc_op, \
+           net['labels'], \
+           train_prediction, \
+           eval_prediction, \
+           logits
 
 
 def load_imgs(img_path, label):
@@ -350,7 +354,12 @@ def eval(sess, acc_op, acc, predictions, labels):
 def main(argv):
     tf.logging.set_verbosity(tf.logging.INFO)
 
-    loss, acc, acc_op, labels, train_prediction, eval_prediction, logits = cnn_model_fn()
+    loss, \
+    acc, acc_op, \
+    labels, \
+    train_prediction, \
+    eval_prediction, \
+    logits = cnn_model_fn()
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, epsilon=1e-7, use_locking=False)
 
