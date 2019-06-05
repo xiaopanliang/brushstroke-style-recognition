@@ -18,9 +18,9 @@ import os
 import cv2
 
 check_pt_path_str = 'checkpoints'
-batch_size = 16
-img_height = 32 * 8
-img_width = 32 * 8
+batch_size = 4
+img_height = 32 * 4
+img_width = 32 * 4
 epochs = 1000
 units = np.amax(np.load("train_lbs.npy")) + 1
 
@@ -261,7 +261,7 @@ def get_train_iterator():
     dataset = dataset.repeat(epochs)
     dataset = dataset.shuffle(30000)
     dataset = dataset.map(map_func=load_imgs)
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.batch(batch_size, drop_remainder=True)
     iterator = dataset.make_one_shot_iterator()
 
     return iterator
@@ -276,7 +276,7 @@ def get_eval_iterator():
     dataset = tf.data.Dataset.from_tensor_slices((img_files, labels))
     dataset = dataset.repeat(1)
     dataset = dataset.map(map_func=load_imgs)
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.batch(batch_size, drop_remainder=True)
     iterator = dataset.make_one_shot_iterator()
     
     return iterator
