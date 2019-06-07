@@ -9,7 +9,7 @@ expect_styles = {'Baroque', 'Expressionism', 'Impressionism', 'Pointillism', 'Re
 
 
 def split_image(img):
-    factor = 4
+    factor = 16
     height, width, _ = img.shape
     sub_height = int(height / factor)
     sub_width = int(width / factor)
@@ -49,8 +49,8 @@ def split_images(ori_file_names, result_file_names, n):
 
 def main():
     cores = 1
-    base = 'output/step2/'
-    output_folder = 'output/step4/'
+    base = 'DataBase/'
+    output_folder = 'Seperated/'
     folders = os.listdir(base)
     ori_file_names = []
     result_file_names = []

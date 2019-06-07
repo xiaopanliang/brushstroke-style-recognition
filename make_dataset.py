@@ -3,25 +3,25 @@ import numpy as np
 import sys
 
 
-special_styles = ['Photorealism', 'Ink and wash painting']
+special_styles = []
 
 
-def main(argv):
+def main(Input):
     train_files = []
     train_labels = []
 
     eval_files = []
     eval_labels = []
 
-    styles = os.listdir(argv[1])
+    styles = os.listdir(Input)
     styles.sort()
 
     for label, style in enumerate(styles):
         if style != ".DS_Store" and style not in special_styles:
-            datasets = os.listdir(argv[1] + "/" + style)
+            datasets = os.listdir(Input + "/" + style)
             for dataset in datasets:
                 if dataset != ".DS_Store":
-                    dataset_dir = argv[1] + "/" + style + "/" + dataset
+                    dataset_dir = Input + "/" + style + "/" + dataset
                     if dataset == "train_set":
                         imgs = os.listdir(dataset_dir)
                         for img in imgs:
@@ -43,10 +43,6 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("Program accepts the directory parameter!")
-        sys.exit(1)
-
     print('starting making dataset...')
-    main(sys.argv)
+    main('old_Seperation')
     print('finished making dataset')
