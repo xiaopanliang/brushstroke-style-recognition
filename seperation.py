@@ -16,20 +16,29 @@ import random
 
 def crop_imgs(img, style):
     croped = []
-    # Resize to 256 * 256 img
-    resized_img = cv2.resize(img, (256, 256))
+
+    ratio = 15 / 16
+    height, width, _ = img.shape
+    
+    crop_height = int(height * ratio)
+    crop_width = int(width * ratio)
+    
+    cur_hei_space = height - crop_height
+    cur_wi_space = width - crop_width
+
     # Crop 224 * 224 pieces
-    crop_num = 16
+    crop_num = 4
     if style == "Ink and wash painting":
-        crop_num = 22
+        crop_num = 6
     elif style == "Photorealism":
-        crop_num = 71
+        crop_num = 16
     for _ in range(crop_num):
-        start_point_y = random.randint(0, 32)
-        start_point_x = random.randint(0, 32)
-        croped_img = resized_img[start_point_y:start_point_y + 224,
-                                 start_point_x:start_point_x + 224]
+        start_point_y = random.randint(0, cur_hei_space)
+        start_point_x = random.randint(0, cur_wi_space)
+        croped_img = img[start_point_y:start_point_y + crop_height,
+                                 start_point_x:start_point_x + crop_width]
         croped.append(croped_img)
+    
     return croped
 
 
@@ -48,36 +57,36 @@ def main(argv):
     output = argv[2]
     if not os.path.exists(output):
         os.makedirs(output)
-    styles = os.listdir(argv[1])
-    for style in styles:
-        if not os.path.exists(output + "/" + style):
-            if style != ".DS_Store":
-                print("processing style:" + style)
-                # Create the directory
-                if not os.path.exists(output + "/" + style):
-                    os.makedirs(output + "/" + style)
-                # Get imgs for each style
-                imgs = os.listdir(argv[1] + "/" + style)
-                # Shuffle imgs
-                random.shuffle(imgs)
-                split_index = int(len(imgs) * 0.9)
-                train_imgs = imgs[:split_index]
-                eval_imgs = imgs[split_index:]
-                train_set_output_dir = output + "/" + style + "/train_set"
-                eval_set_output_dir = output + "/" + style + "/eval_set"
-                # Create test set folder and folder for storing imgs
-                if not os.path.exists(train_set_output_dir):
-                    os.makedirs(train_set_output_dir)
-                if not os.path.exists(eval_set_output_dir):
-                    os.makedirs(eval_set_output_dir)
-                input_dir = argv[1] + "/" + style
-                start_croping(train_imgs, input_dir, train_set_output_dir, style)
-                start_croping(eval_imgs, input_dir, eval_set_output_dir, style)
+    input_p = argv[1]
+    style = input_p[input_p.rindex('/')+1:]
+    if not os.path.exists(output + "/" + style):
+        if style != ".DS_Store":
+            print("processing style:" + style)
+            # Create the directory
+            if not os.path.exists(output + "/" + style):
+                os.makedirs(output + "/" + style)
+            # Get imgs for each style
+            imgs = os.listdir(input_p)
+            # Shuffle imgs
+            random.shuffle(imgs)
+            split_index = int(len(imgs) * 0.9)
+            train_imgs = imgs[:split_index]
+            eval_imgs = imgs[split_index:]
+            train_set_output_dir = output + "/" + style + "/train_set"
+            eval_set_output_dir = output + "/" + style + "/eval_set"
+            # Create test set folder and folder for storing imgs
+            if not os.path.exists(train_set_output_dir):
+                os.makedirs(train_set_output_dir)
+            if not os.path.exists(eval_set_output_dir):
+                os.makedirs(eval_set_output_dir)
+
+            start_croping(train_imgs, input_p, train_set_output_dir, style)
+            start_croping(eval_imgs, input_p, eval_set_output_dir, style)
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("Program accepts the directory parameter and the output directory!")
+        print("Program accepts the style dir parameter and the output directory!")
         sys.exit(1)
 
     print("start separation...")
