@@ -49,7 +49,7 @@ def start_croping(imgs, input_dir, output_dir, style):
             croped_imgs = crop_imgs(img_data, style)
             for n, croped_img in enumerate(croped_imgs):
                 file_name = output_dir + "/" + \
-                    img[:-4] + "_" + str(n) + ".png"
+                    img[:-4] + "_" + str(n) + ".jpg"
                 cv2.imwrite(file_name, croped_img)
 
 

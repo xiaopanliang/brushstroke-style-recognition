@@ -16,7 +16,7 @@ import math
 import os
 
 check_pt_path_str = 'checkpoints'
-batch_size = 16
+batch_size = 4
 img_height = 32 * 8
 img_width = 32 * 8
 epochs = 100
@@ -198,29 +198,17 @@ def cnn_model_fn():
     net['pool5'] = pool_layer('pool5', net['relu5_4'])
 
     # Fully connected to get logits
-    obj_logits = calc_obj_logits(net)
     texture_logits = calc_texture_logits(net)
-    # obj_logits = tf.multiply(obj_logits,tf.reduce_mean(texture_logits)/tf.reduce_mean(obj_logits))
-    # concat_logits = tf.concat([obj_logits, texture_logits], axis=1)
-    # concat_logits = 0.9*texture_logits + 0.1*obj_logits
-    net['fc1_o'] = fc_layer('fc1_o', obj_logits, 512, tf.nn.relu)
-    net['fc2_o'] = fc_layer('fc2_o', tf.layers.dropout(net['fc1_o'],0), 512, tf.nn.relu)
-    net['fc3_o'] = fc_layer('fc3_o', tf.layers.dropout(net['fc2_o'],0), units, None)
-
-    #    Denoise_logits = calc_regularization_logits(net)
-    object_f_logits = net['fc3_o']
-
     net['fc1_t'] = fc_layer('fc1_t', texture_logits, 512, tf.nn.relu)
     net['fc2_t'] = fc_layer('fc2_t', tf.layers.dropout(net['fc1_t'],0), 512, tf.nn.relu)
     net['fc3_t'] = fc_layer('fc3_t', tf.layers.dropout(net['fc2_t'],0), units, None)
-    texture_f_logits = net['fc3_t']
+    
+    logits = net['fc3_t']
 
-    f_logits = (0.1 * object_f_logits + 0.9 * texture_f_logits)
-
-    sum_logits = tf.reduce_mean(f_logits, 0, keepdims=True)
+    sum_logits = tf.reduce_mean(logits, 0, keepdims=True)
     sum_logits = tf.concat([sum_logits] * batch_size, 0)
 
-    train_prediction = tf.argmax(input=f_logits, axis=1, name="train_prediction")
+    train_prediction = tf.argmax(input=logits, axis=1, name="train_prediction")
     eval_prediction = tf.argmax(input=sum_logits, axis=1, name='eval_prediction')
     
     acc, acc_op = tf.metrics.accuracy(labels=net['labels'], predictions=eval_prediction)
@@ -230,7 +218,7 @@ def cnn_model_fn():
     #  )
     # weights = tf.trainable_variables()  # all vars of your graph
     # regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, weights)
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=f_logits)
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=net['labels'], logits=logits)
 
     # conf, conf_op = tf.confusion_matrix(labels=net['labels'], predictions=testing_prediction)
 
@@ -245,12 +233,12 @@ def cnn_model_fn():
            net['labels'], \
            train_prediction, \
            eval_prediction, \
-           f_logits
+           logits
 
 
 def load_imgs(img_path, label):
     img_string = tf.read_file(img_path)
-    img = tf.image.decode_jpeg(img_string, 0)
+    img = tf.image.decode_png(img_string, 0)
     img = tf.image.resize_image_with_pad(img, img_height, img_width)
     # img = tf.image.grayscale_to_rgb(img)
     # img = tf.image.adjust_contrast(img,10)
