@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Mon Oct 15 09:18:40 2018
@@ -84,10 +85,12 @@ def main(Input, output):
                 start_croping(eval_imgs, input_dir, eval_set_output_dir, style)
 
 
-if __name__ == '__main__':
-    print("start separation...")
-    start_time = time.time()
-    main('old_DataBase','old_Seperation')
-    make_dataset.main('Seperation')
-    end_time = time.time()
-    print('finished:' + str(end_time - start_time) + "s")
+print("start separation... hmmm")
+print(__name__)
+# if __name__ == '__main__':
+print("start separation...")
+start_time = time.time()
+# main('Database','Separated')
+make_dataset.main('Separated')
+end_time = time.time()
+print('finished:' + str(end_time - start_time) + "s")

@@ -7,6 +7,7 @@ special_styles = []
 
 
 def main(Input):
+    print("Input:", Input)
     train_files = []
     train_labels = []
 
@@ -17,6 +18,7 @@ def main(Input):
     styles.sort()
 
     for label, style in enumerate(styles):
+        print("Label:",label,"Style:",style)
         if style != ".DS_Store" and style not in special_styles:
             datasets = os.listdir(Input + "/" + style)
             for dataset in datasets:

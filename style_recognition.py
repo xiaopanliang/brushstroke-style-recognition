@@ -375,7 +375,7 @@ def main(Command):
 
     # The counter for tracking the number of batches
     count = 0
-    with tf.device('/gpu:0'), tf.Session() as sess:
+    with tf.device('/cpu:0'), tf.Session() as sess:
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
@@ -392,7 +392,7 @@ def main(Command):
                     train_data, train_label = sess.run(next_train_batch)
                     _, _, _, channel = train_data.shape
 
-                    if channel == 3:
+                    if channel == 3: # JY: What if channel != 3?
                         for _ in range(100):
                             train_dict = {net['input']: train_data, net['labels']: train_label}
                             # Train the model
@@ -438,5 +438,5 @@ def main(Command):
             print("unrecognized mode!!!")
 
 
-if __name__ == "__main__":
-    main('eval')
+#if __name__ == "__main__":
+main('train')
