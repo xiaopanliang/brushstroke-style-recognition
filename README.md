@@ -10,6 +10,14 @@ pip install scipy
 pip install opencv-python # for cv2
 ```
 
+## For DGX Docker image
+
+Must run 
+```
+apt-get install -y libsm6 libxext6 libxrender-dev
+```
+in order for the import cv2 command to work (in addition to running the pip install above)
+
 # Download
 From
 https://www.kaggle.com/teksab/imagenetvggverydeep19mat/downloads/imagenetvggverydeep19mat.zip/1
