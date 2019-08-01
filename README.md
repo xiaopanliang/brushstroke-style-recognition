@@ -3,9 +3,12 @@ The GitHub repository for the research project:
 
 # Install
 As admin or in venv:
-    pip install tensorflow
-    pip install scipy
-    pip install opencv-python # for cv2
+
+```
+pip install tensorflow
+pip install scipy
+pip install opencv-python # for cv2
+```
 
 # Download
 From
