@@ -59,7 +59,12 @@ def main(argv):
         os.makedirs(output)
     input_p = argv[1]
     style = input_p[input_p.rindex('/')+1:]
-    if not os.path.exists(output + "/" + style):
+    if not style:
+        style = input_p[input_p[:-1].rindex('/'):]
+    print("style:",style)
+    if os.path.exists(output + "/" + style):
+        print("Warning: Cannot process. Output path already exists")
+    else:
         if style != ".DS_Store":
             print("processing style:" + style)
             # Create the directory

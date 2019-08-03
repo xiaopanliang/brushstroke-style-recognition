@@ -316,11 +316,11 @@ def get_layer_output(sess, net, layer, data_batch, label_batch):
 
 
 def eval(sess, acc_op, acc, predictions, labels):
-    with tf.device('/cpu:0'):
+    with tf.device('/cpu:1'):
         itr_eval = get_eval_iterator()
         next_eval_batch = itr_eval.get_next()
     batch_num = 0
-    with tf.device('/gpu:0'):
+    with tf.device('/gpu:1'):
         while True:
             try:
                 print('********************************')
@@ -355,21 +355,25 @@ def main(Command):
 
     optimizer = tf.train.AdamOptimizer(learning_rate=0.000001, epsilon=1e-2, use_locking=False)
 
-    train_op = optimizer.minimize(loss)
+    with tf.device('/gpu:1'), tf.Session(config=tf.ConfigProto(
+      allow_soft_placement=True)) as sess:
+        train_op = optimizer.minimize(loss)
+    
+        # Get the iterator for the data set
+        itr_train = get_train_iterator()
+        next_train_batch = itr_train.get_next()
+    
+        itr_eval = get_eval_iterator()
+        next_eval_batch = itr_eval.get_next()
+    
+        # Define the saver for storing variables
+        saver = tf.train.Saver(tf.trainable_variables())
 
-    # Get the iterator for the data set
-    itr_train = get_train_iterator()
-    next_train_batch = itr_train.get_next()
+        # The counter for tracking the number of batches
+        count = 0
 
-    itr_eval = get_eval_iterator()
-    next_eval_batch = itr_eval.get_next()
-
-    # Define the saver for storing variables
-    saver = tf.train.Saver(tf.trainable_variables())
-
-    # The counter for tracking the number of batches
-    count = 0
-    with tf.device('/gpu:0'), tf.Session() as sess:
+    with tf.device('/gpu:1'), tf.Session(config=tf.ConfigProto(
+      allow_soft_placement=True)) as sess:
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
