@@ -4,7 +4,7 @@ import sys
 
 
 special_styles = ['Photorealism', 'Ink and wash painting']
-
+expected_styles = ['Academicism', 'Ukiyo_e']
 
 def main(argv):
     train_files = []
@@ -16,8 +16,10 @@ def main(argv):
     styles = os.listdir(argv[1])
     styles.sort()
 
-    for label, style in enumerate(styles):
-        if style != ".DS_Store" and style not in special_styles:
+    label = 0
+
+    for style in styles:
+        if style != ".DS_Store" and style in expected_styles:
             datasets = os.listdir(argv[1] + "/" + style)
             for dataset in datasets:
                 if dataset != ".DS_Store":
@@ -34,6 +36,7 @@ def main(argv):
                             if img != ".DS_Store":
                                 eval_files.append(dataset_dir + "/" + img)
                                 eval_labels.append(label)
+            label += 1
 
     np.save('train_imgs', train_files)
     np.save('train_lbs', train_labels)
