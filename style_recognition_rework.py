@@ -7,18 +7,18 @@ Created on Sun Sep 30 18:10:07 2018
 
 import tensorflow as tf
 import numpy as np
-import scipy.io
 import math
 import os
+import scipy.io
+import sys
 
 check_pt_path_str = 'checkpoints'
 batch_size = 16
-# eval_size = 4
 eval_size = 16
 img_height = 256
 img_width = 256
 epochs = 100
-units = 2
+units = np.amax(np.load('train_lbs.npy')) + 1
 
 
 def conv_layer(name, layer_input, w):
@@ -197,27 +197,36 @@ def cnn_model_fn():
 
     # Fully connected to get logits
     texture_logits = calc_texture_logits(net)
-    obj_logits = calc_obj_logits(net)
-
-
-    net['fc1_t'] = fc_layer('fc1_tepochs', texture_logits, 512, tf.nn.relu)
+    net['fc1_t'] = fc_layer('fc1_t', texture_logits, 512, tf.nn.relu)
     net['fc2_t'] = fc_layer('fc2_t', tf.layers.dropout(net['fc1_t'],0), 512, tf.nn.relu)
     net['fc3_t'] = fc_layer('fc3_t', tf.layers.dropout(net['fc2_t'],0), units, None)
-
-    net['fc1_o'] = fc_layer('fc1_oepochs', obj_logits, 512, tf.nn.relu)
-    net['fc2_o'] = fc_layer('fc2_o', tf.layers.dropout(net['fc1_o'],0), 512, tf.nn.relu)
-    net['fc3_o'] = fc_layer('fc3_o', tf.layers.dropout(net['fc2_o'],0), units, None)
     
-    logits = tf.abs(net['fc3_t'] * 1 + net['fc3_o'] *0)
+    logits = net['fc3_t']
+
+    sum_logits = tf.reduce_mean(logits, 0, keepdims=True)
+    sum_logits = tf.concat([sum_logits] * batch_size, 0)
+
+    # obj_logits = calc_obj_logits(net)
+
+
+    # net['fc1_t'] = fc_layer('fc1_tepochs', texture_logits, 512, tf.nn.relu)
+    # net['fc2_t'] = fc_layer('fc2_t', tf.layers.dropout(net['fc1_t'],0), 512, tf.nn.relu)
+    # net['fc3_t'] = fc_layer('fc3_t', tf.layers.dropout(net['fc2_t'],0), units, None)
+
+    # net['fc1_o'] = fc_layer('fc1_oepochs', obj_logits, 512, tf.nn.relu)
+    # net['fc2_o'] = fc_layer('fc2_o', tf.layers.dropout(net['fc1_o'],0), 512, tf.nn.relu)
+    # net['fc3_o'] = fc_layer('fc3_o', tf.layers.dropout(net['fc2_o'],0), units, None)
+    
+    # logits = tf.abs(net['fc3_t'] * 1 + net['fc3_o'] *0)
 
     # sum_logits1 = tf.reduce_mean(logits[0:3], 0, keepdims=True)
     # sum_logits2 = tf.reduce_mean(logits[4:7], 0, keepdims=True)
     # sum_logits3 = tf.reduce_mean(logits[8:11], 0, keepdims=True)
     # sum_logits4 = tf.reduce_mean(logits[12:15], 0, keepdims=True)
     # sum_logits = tf.concat([sum_logits1]*eval_size+[sum_logits2]*eval_size+ \
-        # [sum_logits3]*eval_size+[sum_logits4]*eval_size, 0)
-    sum_logits1 = tf.reduce_mean(logits, 0, keepdims=True)
-    sum_logits = tf.concat([sum_logits1] * eval_size, 0)
+    #     [sum_logits3]*eval_size+[sum_logits4]*eval_size, 0)
+    # sum_logits1 = tf.reduce_mean(logits, 0, keepdims=True)
+    # sum_logits = tf.concat([sum_logits1] * eval_size, 0)
     # sum_logits = logits
 
     train_prediction = tf.argmax(input=logits, axis=1, name="train_prediction")
@@ -250,7 +259,7 @@ def cnn_model_fn():
 
 
 def load_imgs(img_path, label):
-    img_string = tf.read_file(img_path)
+    img_string = tf.io.read_file(img_path)
     img = tf.image.decode_image(img_string, 0)
     img = tf.image.resize_image_with_pad(img, img_height, img_width)
     # img = tf.image.grayscale_to_rgb(img)
@@ -326,34 +335,6 @@ def get_layer_output(sess, net, layer, data_batch, label_batch):
             plt.savefig(directory + str(n) + '.png', bbox_inches='tight', pad_inches=0)
 
 
-def eval(sess, acc_op, acc, predictions, labels):
-    with tf.device('/cpu:0'):
-        itr_eval = get_eval_iterator()
-        next_eval_batch = itr_eval.get_next()
-    batch_num = 0
-    with tf.device('/device:XLA_GPU:0'):
-        while True:
-            try:
-                print('********************************')
-                print('processing batch:' + str(batch_num))
-                eval_data, eval_label = sess.run(next_eval_batch)
-                eval_dict = {net['input']: eval_data, net['labels']: eval_label}
-                # Update the accuracy
-                sess.run(acc_op, feed_dict=eval_dict)
-                # Compute labels and predictions
-                labels_str = str(sess.run(labels, feed_dict=eval_dict))
-                predictions_str = str(sess.run(predictions, feed_dict=eval_dict))
-                print("labels:", labels_str)
-                print("predictions:", predictions_str)
-                # Update the batch number
-                batch_num += 1
-            except tf.errors.OutOfRangeError:
-                # Determine if the end of the eval dataset is reached
-                break
-    acc_str = str(sess.run(acc))
-    print("accuracy:", acc_str)
-
-
 def main(Command):
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -388,7 +369,7 @@ def main(Command):
         latest_checkpoint = tf.train.latest_checkpoint(check_pt_path_str)
         if latest_checkpoint is not None:
             saver.restore(sess, latest_checkpoint)
-            # saver.restore(sess, 'checkpoints/epoch_39_model.ckpt')
+            # saver.restore(sess, 'checkpoints/epoch_30_model.ckpt')
 
         if Command == "train":            
             epoch_loss_list = []
@@ -425,15 +406,9 @@ def main(Command):
                     except:
                         print("Batch Size Error, Skip to next")
                         break
-
-                # print("labels:" + str(sess.run(net['labels'], feed_dict=train_dict)))
-                # print("prediction:" + str(sess.run(train_prediction, feed_dict=train_dict)))
-                # plt.plot(batch_loss_list) # Plot batch loss
-                # plt.show()
-
                 print('Epoch', idx_epoch, ' Avg_loss:', avg_loss)
                 epoch_loss_list.append(avg_loss)
-                if (idx_epoch + 1) % 2 == 0:
+                if idx_epoch % 10 == 0:
                     print("saving checkpoint every 2 epoches...")
                     saver.save(sess, check_pt_path_str + '/epoch_' + str(idx_epoch) + '_model.ckpt')
                 
@@ -453,18 +428,14 @@ def main(Command):
                 avg_loss = batch_loss / batch_count
                 eval_loss_list.append(avg_loss)
                 print('Epoch', idx_epoch, 'Eval Loss:', avg_loss)
-            
-            # figure(dpi=100)
-            # plt.plot(epoch_loss_list, linewidth=2)
-            # plt.plot(eval_loss_list, linewidth=2)
-            # plt.show()
-
         elif Command == "eval":
             print("evaluating...")
             sess.run(itr_eval.initializer)
+            sess.run(itr_train.initializer)
             ind = 0
             while ind <= 3000:
                 eval_data, eval_label = sess.run(next_eval_batch)
+                # train_data, train_label = sess.run(next_train_batch)
                 # if eval_label[0] != 5 and eval_label[0] != 6:
                 print(ind)
                 eval_dict = {net['input']: eval_data, net['labels']: eval_label}
@@ -491,4 +462,8 @@ def main(Command):
 
 
 if __name__ == "__main__":
-    main('eval')
+    if len(sys.argv) < 3 or (sys.argv[1] != "train" and sys.argv[1] != "eval") or (sys.argv[2] != "gpu:0" and sys.argv[2] != "gpu:1"):
+        print("Program accepts mode train|eval gpu:0|gpu:1")
+        sys.exit(1)
+    os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2][-1]
+    main(sys.argv[1])
